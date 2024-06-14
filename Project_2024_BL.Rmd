@@ -1,0 +1,516 @@
+---
+title: "Final project ataset: 2024"
+output: html_document
+date: "2024-05-14"
+---
+
+
+
+See also the pdf file with more information on the project. 
+
+
+
+
+## 1) Bike sharing data.  
+
+The data are from 
+https://www.kaggle.com/code/juniorbueno/rental-bikes/notebook
+
+
+The data contains the number of casual/registered users in bike sharing systems and various additional covariates (related to the weather) as well information on days/month/year. 
+
+
+instant: record index
+
+dteday : date
+
+season : season (1:winter, 2:spring, 3:summer, 4:fall)
+
+yr : year (0: 2011, 1:2012)
+
+mnth : month ( 1 to 12)
+
+hr : hour (0 to 23)
+
+holiday : weather day is holiday or not
+
+weekday : day of the week
+
+workingday : if day is neither weekend nor holiday is 1, otherwise is 0.
+
+weathersit :
+
+1: Clear, Few clouds, Partly cloudy, Partly cloudy
+
+2: Mist + Cloudy, Mist + Broken clouds, Mist + Few clouds, Mist
+
+3: Light Snow, Light Rain + Thunderstorm + Scattered clouds, Light Rain + Scattered clouds
+
+4: Heavy Rain + Ice Pallets + Thunderstorm + Mist, Snow + Fog
+
+temp : Normalized temperature in Celsius. The values are derived via (t-tmin)/ (tmax-tmin), tmin=-8, t_max=+39 (only in hourly scale)
+
+atemp: Normalized feeling temperature in Celsius. The values are derived via (t-tmin)/(tmax-tmin), tmin=-16, t_max=+50 (only in hourly scale)
+
+hum: Normalized humidity. The values are divided to 100 (max)
+
+windspeed: Normalized wind speed. The values are divided to 67 (max)
+
+casual: count of casual users  
+
+registered: count of registered users
+
+cnt: count of total rental bikes including both casual and registered
+
+Fit a regression model for predicting the count of total rental bikes (or casual/registered). Since the counts are large numbers, you can scale them (e.g., by dividing by 100 and subtracting 10). Discuss the impact of the various variables. Pay attention to the fact that there are many categorical variables. Perform a model selection and prediction exercise.
+
+
+
+
+
+```{r}
+rm(list=ls())
+#bike
+#https://www.kaggle.com/code/juniorbueno/rental-bikes/input?select=day.csv
+data = read.csv("data/bike.csv")
+hist(data$cnt,main="Bike sharing",xlab="bikes")
+data = data.frame(data[,3:16])
+dim(data)
+head(data)
+boxplot(data$cnt~data$holiday,xlab="holiday/not holiday",ylab="bikes",main="Bike sharing")
+boxplot(data$cnt~data$mnth,ylab="bikes",xlab="month",main="Bike sharing")
+
+data_s=data.frame(data[,8:12])
+data_s =data.frame(apply(data_s,2,as.numeric))
+data_s$casual=(data_s$casual-mean(data_s$casual))/sd(data_s$casual)
+head(data_s)
+model = lm(data_s$casual~.,data=data_s)
+
+summary(model)
+
+plot(data_s$casual,type="l",xlab="time",ylab="",main="Bike sharing")
+lines(model$fitted.values,lty=3,col="red")
+```
+
+
+
+## 2) Industrial production index 
+
+The dataset consists in 12 economic indexes for the US economy. For each index reported is the Percent Change from Year Ago, Seasonally Adjusted, and the data are monthly. 
+
+The indexes are:
+
+Industrial Production: Total Index (INDPRO)
+
+Wilshire 5000 Price Index (WILL5000PR)
+
+New One Family Houses Sold: United States (HSN1F)
+
+Crude Oil Prices: Brent - Europe (DCOILBRENTEU)
+
+Total Vehicle Sales (TOTALSA)
+
+Consumer Price Index for All Urban Consumers: Food in U.S. 
+
+City Average (CPIUFDSL)
+
+Japanese Yen to U.S. Dollar Spot  Exchange Rate  (DEXJPUS)
+
+University of Michigan: Inflation Expectation  (MICH)
+
+CBOE Volatility Index: VIX (VIXCLS)
+
+All Employees, Total Nonfarm (PAYEMS)
+
+Producer Price Index by Commodity: All Commodities (PPIACO)
+
+Sticky Price Consumer Price Index less Food and Energy (CORESTICKM159SFRBATL)
+
+More information can be found in the additional file. 
+
+Task. Perform a linear regression on the dataset using the Industrial Production Index as the response variable and all the other variables as predictors. Discuss the importance of the various predictors and develop a parsimonious model. Discuss model selection,  prediction and out-of-sample validation. 
+
+
+
+```{r}
+rm(list=ls())
+
+# Industrial production dataset
+
+data = read.table("data/indprod.csv",sep=";",header=T)
+data = data.frame(apply(data[,2:13],2,as.numeric))
+dim(data)
+head(data)
+model = lm(data$INDPRO_PCH~.,data=data)
+
+summary(model)
+
+plot(data$INDPRO_PCH,type="l",xlab="time",ylab="Ind. Prod.",main="Ind. Prod")
+lines(model$fitted.values,lty=3,col="red")
+```
+
+
+### 3) Airline Customer satisfaction
+
+The dataset provides insights into customer satisfaction levels within an undisclosed airline company. While the specific airline name is withheld, the dataset is rich in information, containing 22 columns.
+
+Column name	Description: 
+
+Satisfaction.	Indicates the satisfaction level of the customer.
+
+Customer Type.	Type of customer: 'Loyal Customer' or 'Disloyal Customer’.
+
+Age:	Age of the customer.
+
+Type of Travel.	Purpose of the travel: 'Business travel' or 'Personal Travel’.
+
+Class:	Class of travel. 'Business', 'Eco', or 'Eco Plus’.
+
+Flight Distance.	The distance of the flight in kilometres
+
+Seat comfort.	Rating of seat comfort provided during the flight (1 to 5). 
+
+Departure/Arrival time convenient.	Rating of the convenience of departure/arrival time (1 to 5).
+
+Food and drink.	Rating of food and drink quality provided during the flight (1 to 5).
+
+Gate location.	Rating of gate location convenience (1 to 5).
+
+Inflight wifi service.	Rating of inflight wifi service satisfaction (1 to 5).
+
+Inflight entertainment.	Rating of inflight entertainment satisfaction (1 to 5).
+
+Online support. Rating of online customer support satisfaction (1 to 5).
+
+Ease of Online booking.	 Rating of ease of online booking satisfaction (1 to 5).
+
+On-board service.	Rating of on-board service satisfaction (1 to 5).
+
+Leg room service.	Rating of leg room service satisfaction (1 to 5).
+
+Baggage handling.	Rating of baggage handling satisfaction (1 to 5).
+
+Checkin service.	Rating of check-in service satisfaction (1 to 5).
+
+Cleanliness.	Rating of cleanliness satisfaction (1 to 5).
+Online boarding	Rating of online boarding satisfaction (1 to 5).
+
+Departure Delay in Minutes.	Total departure delay in minutes.
+
+Arrival Delay in Minutes.	Total arrival delay in minutes.
+
+
+We select from the original dataset 1000 custumers. 
+
+
+
+We select from the original dataset 1000 customers. 
+
+
+Task. Perform a suitable regression for the categorical response variable "Satisfaction." Identify the variables that are correlated with "Satisfaction." A prediction exercise is required. You may discuss variable selection if desired.
+
+Use only some of the covariates, starting with: Age, Seat Comfort, Flight Distance, Class, Departure Delay, and Arrival Delay.
+
+
+More data and info are provided at https://www.kaggle.com/datasets/raminhuseyn/airline-customer-satisfaction
+
+
+
+```{r}
+rm(list=ls())
+# Airline Customer satisfaction
+# https://www.kaggle.com/datasets/raminhuseyn/airline-customer-satisfaction
+#data = read.csv("Airline_customer_satisfaction.csv")
+#index = sample(1:nrow(data),1000,replace=F)
+#airline_sub = data[index,]
+#row.names(airline_sub) = 1:nrow(airline_sub)
+#write.csv(airline_sub,"data/airline_sub.csv")
+
+airline_sub = read.csv("data/airline_sub.csv")
+
+boxplot(airline_sub$Arrival.Delay.in.Minutes~airline_sub$satisfaction,xlab="satisfaction",ylab="Arrival.Delay",main="Airline")
+```
+
+Task. Perform a suitable regression for the categorical response variable "Satisfaction." Identify the variables that are correlated with "Satisfaction." A prediction exercise is required. You may discuss variable selection if desired.
+
+Use only some of the covariates, starting with: Age, Seat Comfort, Flight Distance, Class, Departure Delay, and Arrival Delay.
+
+More data and info are provided at https://www.kaggle.com/datasets/raminhuseyn/airline-customer-satisfaction
+
+
+# 4. Wine
+
+There are two datasets that are related to red and white variants of the Portuguese ”Vinho Verde” wine. We consider the white one. Due to privacy and
+logistic issues, only physicochemical (inputs) and sensory (the output) variables
+are available (e.g. there is no data about grape types, wine brand, wine selling
+price, etc.).
+ The classes
+are ordered and not balanced (e.g. there are many more normal wines than
+excellent or poor ones). Outlier detection algorithms could be used to detect
+the few excellent or poor wines. 
+
+Task. The Dataset can be viewed as classification or regression tasks.
+Also, we are not sure if all input variables are
+relevant. So it could be interesting to test feature selection methods. You can try different models, but you need to try a Binomial regression. 
+You can also aggragate votes, resulting in a different range of the Binomial. Discuss the differences if you estimate more than one model. 
+
+
+
+```{r}
+wine=read.csv("data/wine.csv")
+head(wine)
+#binary version !!
+#wine01=wine
+#wine01$quality <- as.factor(ifelse(wine$quality <6, 0, 1))
+#table(wine01$quality)
+#summary(glm(quality~., data=wine01, family=binomial()))
+
+hist(wine$quality,seq(1,10,1),xlab="quality",main="wine")
+```
+
+
+# 5. JFK Passengers
+
+<https://github.com/alan-turing-institute/TCPD/tree/master/datasets/jfk_passengers>
+
+The Port Authority collects monthly data for domestic and international, cargo, flights, passengers and aircraft equipment type from each carrier at PANYNJ-operated airports.
+
+Task. 
+
+This dataset can be analyzed using a change point model with two different means (before and after the change point), possibly adding a linear drift in the mean after the change point.
+More complex models with a change point can also be fitted and discussed. Time series models are suggested,  two different trends and two different variances
+can be considerer (before and after the change point). 
+
+
+
+```{r}
+JFK <- read.csv("data/JFK.csv")
+head(JFK)
+dim(JFK)
+
+JFK$time__raw=as.Date(paste(JFK$time__raw,"-01",sep=""))
+plot(JFK$time__raw,JFK$series__raw,xlab="time",ylab="pass",main="JFK")
+plot(JFK$time__raw[1:36],JFK$series__raw[1:36],xlab="time",ylab="pass",main="JFK")
+```
+
+# 6. GDP & INFLATION US
+
+The data consists in two time series:
+
+Gross Domestic Product (GDP) 
+
+Consumer Price Index for All Urban Consumers: All Items in U.S. City Average (CPIAUCSL)
+
+(more info in the additional file)
+
+Task. Fit some time series models for the two series (separately). You can to try  AR,MA,GARCH or ARMA. In case you use more model, compare the models 
+with some Information criteria (BIC,DIC,WAIC). 
+You can also  try a bivariate time series models, e.g. a simple VAR(1) model (in this case, ask to the teacher for more information). 
+
+
+
+```{r}
+rm(list=ls())
+
+# New Family Houses Sold: United States
+# Source: https://fred.stlouisfed.org/series/HSN1F
+
+data = read.csv("data/gdp_inflation.csv",header=T)
+data$DATE = as.Date(data$DATE)
+sum(is.na(data$GDP_PC1))
+plot(data$DATE[1:305],data$GDP_PC1[1:305],type="l",xlab="",ylab="GDP",main="GDP+INFL")
+lines(data$DATE[1:305],data$CPIAUCSL_PC1[1:305],type="l",col="red")
+#data$CPIAUCSL_PC1
+#data1=as.numeric(data$GDP_PC1[1:305])
+```
+
+
+# 7. FORSET FIRES
+
+This dataset reports the number of forest fires in Brazil divided by state. The series comprises the period of approximately 10 years (1998 to 2017).
+
+Task: Fit a regression model with the number of fires as the response variable. You can start by considering data from only one state. The two basic covariates are the year and the month. You can try using an integer-valued distribution, or, if that fails, a normal model (scaling the data with some transformation if necessary).
+
+If you want to use integer-valued observations, round the data to obtain integer numbers for the number of fires (since some data are not integers). You can also try a more complex model including data from more states.
+
+
+
+```{r}
+rm(list=ls())
+
+AMAZONFOREST <- read.csv("data/amazon.csv")
+ST=unique(AMAZONFOREST$state)
+
+STATE=ST[4]
+
+data=AMAZONFOREST[AMAZONFOREST$state==STATE,]
+boxplot(data$number~data$month,xlab="month",ylab="fires",main="AMAZON FIRES")
+boxplot(data$number~data$year,xlab="year",ylab="fires",main="AMAZON FIRES")
+
+dim(AMAZONFOREST)
+```
+
+
+# 8. CO2 data
+
+Human emissions of carbon dioxide and other greenhouse gases – are a primary driver of climate change – and present one of the world’s most pressing challenges.
+
+https://ourworldindata.org/co2-and-other-greenhouse-gas-emissions
+
+Some data possibly related to C02 emissions, have been extracted from 
+
+https://ourworldindata.org.
+
+Data have been selected for various nations and various years. 
+
+
+Consider a regression model to explain C02 emission with the other variables. 
+You can transform some of the variables. 
+Additional questions: C02 and GDP are strongly dependent? 
+Historically, CO2 emissions have been strongly correlated with how much money we have. This is particularly true at low-to-middle incomes. The richer we are, the more CO2 we emit. This is because we use more energy – which often comes from burning fossil fuels. 
+ This relationship is stil true  at higher incomes? 
+In addition you can: consider and compare various years. Consider the time as a covariate. Add more covariates (taking  them from the web). 
+Consider time series models. 
+
+ 
+
+```{r}
+rm(list=ls())
+CO2 <- read.csv("data/CO2.csv")
+head(CO2)
+plot(CO2$GDP,CO2$co2percap,xlab="GDP",ylab="CO2emission")
+CO2bis=CO2[,(3:9)]
+LM =lm(co2percap~.,data=CO2bis)
+summary(LM)
+q=quantile(CO2$GDP,0.65)
+plot(CO2$GDP[CO2$GDP>q],CO2$co2percap[CO2$GDP>q],xlab="GDP",ylab="CO2emission")
+```
+
+
+
+# 9. Acidity
+
+The data shows the log acidity index for 155 lakes in the Northeastern United
+States.
+
+Dataset taken from the R package `gamlss.data`.
+
+The students are required to create a model to provide an estimate of the
+density and of the clustering of data.
+
+Also, they should analyze how and why changes in the model and/or in the prior
+fixed values impact the obtained estimates.
+
+```{r}
+rm(list=ls())
+acidity <-read.csv("data/acidity.csv")
+acidity=data.frame(acidity)
+hist(acidity[,2],main="acidity",xlab="")
+```
+
+
+
+
+# 10. Covid Data
+
+
+The dataset records some statistics  related to COVID pandemia in Lombardia  from 2020-12-06 to 2021-7-05. 
+
+The data arte taken from 
+
+https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-regioni/dpc-covid19-ita-regioni.csv
+
+https://raw.githubusercontent.com/tsiotas/covid-19-zone/main/covid-19-zone.csv
+
+
+The variables have been already selected and cleaned. 
+
+Task. 
+Build and estimate a model to forecast on the basis of the variables at day t (newpos, intcar, hosp, newpos-av7D, color, day of the week) 
+the number of patients in hospital and in intensive care at time t+7 (7 day head nowcasting). 
+
+Start by fitting a model only for one of the variables, e.g. "hospH8".
+
+More challenging: estimate time series model to describe the behaviour of the pandemia (do not use hospH8,intcarH8,dayH8). 
+Since the pandemia exhibit a peak you can consider a simple time series with a change point.  You can aslo try well-known epidemic model (e.q. SIR). 
+Be prepared that they do not work very well for the COVID. 
+
+
+
+```{r}
+rm(list=ls())
+covidLom2020_21=read.csv("data/covidLom2020_21.csv")
+#load("data/covidLom2020-21.Rda")
+head(covidLom2020_21)
+covidLom2020_21$day=as.Date(covidLom2020_21$day)
+plot(covidLom2020_21$day,covidLom2020_21$newpos)
+d=as.Date("2021-03-07",format="%Y-%m-%d", xlab="date",ylab="newpos",main="COVID")
+
+abline(v=d,col="red")
+plot(covidLom2020_21$newpos_av7D[covidLom2020_21$day<d],covidLom2020_21$hospH8[covidLom2020_21$day<d],col="blue",
+     xlab="newposav",ylab="hospH8",main="COVID")
+lines(covidLom2020_21$newpos_av7D[covidLom2020_21$day>d],covidLom2020_21$hospH8[covidLom2020_21$day>d],col="red",type="p")
+```
+
+
+# 10. SPF
+
+The  Survey of Professional Forecasters (SPF) are  survey of macrovariables. 
+The US-SPF and ECB-SPF  ask forecasters to report 
+point forecasts and density forecasts. Density forecasts have the form of  histograms with
+ a set of intervals provided in the survey instrument. 
+ 
+ More information on the dataset are provided in the Notebook SPF. 
+ 
+ 
+"H"  horizon
+
+"period"  0 corresponds to 10 bin, 1 to  11 bin 
+
+"YEAR" year
+
+"QUARTER"  quarter  
+
+"ID"  forecaster id. 
+
+ "INDUSTRY" forecaster type
+
+ "bin1"      "bin2"      "bin3"      "bin4"     
+ "bin5"      "bin6"      "bin7"      "bin8"      "bin9"     
+"bin10"     "bin11"   probability given to the bin (to be ignored)   
+
+"nbin_tot" number of bins used 
+
+"openL"     "openR" 1 the forecaster gives positive probability to open (left/right) bin
+
+"n.b.mode"  position of the mode (wrt to bin number)
+
+"prob.mode"  probability assigned to the  modal bin 
+
+"mode"   value of the mode   (unform model fitting) 
+
+"mean"   value of the mean (unform model fitting)   
+
+"var"    value of the variance  (unform model fitting) 
+
+"median"  value of the median  (unform model fitting) 
+
+```{r}
+rm(list=ls())
+GDP=read.csv("data/SPF_GDP.csv")
+head(GDP)
+GDP_B=GDP[GDP$QUARTER==1,]
+Ydata=GDP_B[,c("mean","YEAR","ID")]  # select the variable of interest
+hist(Ydata$mean,main="mean",xlab="SPF-GDP: mean")
+```
+
+Task. Understand if 
+individual uncertainty appears to be associated with a prominent respondent effect, while the point forecast (e.g. mean/median)
+is more affected by the period. 
+That is, while there are marked differences across forecasters in the confidence attached to their predictions, forecasters' confidence changes slowly over time.
+
+Start with a ANOVA type model (see the Notebook).
+Compare variables related to point forecasters (mean/median) with 
+variables related to uncertainty (e.g. variance/probability in the mode). In case you may change the model (e.g for probability in the mode).
+
+Two more models need to be tested. The first is a model which take into considerations possible time effect in the variance of the errors. The second model is a mixture model in which forecaster belongs to common block and their response depends only on the block.  Ask to the teacher for more explanation if you are interested in this project. 
