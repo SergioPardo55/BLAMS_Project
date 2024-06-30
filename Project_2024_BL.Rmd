@@ -38,6 +38,7 @@ rm(list=ls())
 # Source: https://fred.stlouisfed.org/series/HSN1F
 
 data = read.csv("data/gdp_inflation.csv",header=T)
+#summary(data)
 data$DATE = as.Date(data$DATE)
 gdpData = data$GDP_PC1[1:305]
 infData = data$CPIAUCSL_PC1[1:305]
@@ -46,6 +47,8 @@ plot(data$DATE[1:305],gdpData,type="l",xlab="",ylab="GDP",main="GDP+INFL")
 lines(data$DATE[1:305],infData,type="l",col="red")
 #data$CPIAUCSL_PC1
 #data1=as.numeric(data$GDP_PC1[1:305])
+summary(data)
+
 ```
 
 ## AR(1) model INF
@@ -64,8 +67,8 @@ modelAR.string <-"model {
   mu[1]<-Y[1]
   Yp[1]=mu[1]
   for (i in 2:N) {
-    Y[i] ~ dnorm(mu[i],tau)
     mu[i]<-m0+alpha*Y[i-1]
+    Y[i] ~ dnorm(mu[i],tau)
     Yp[i] ~ dnorm(mu[i],tau) # prediction in sample
   }
   # prediction out of sample 
@@ -141,7 +144,7 @@ lines(seq((N+1),Ntot,1),q2_pred,col="orange",lwd = 1.5)
 ```{r}
 plot(outputmcmcAR_GDP$samples[,c("alpha")]
 ,main="posterior alpha")
-#plot(outputmcmcAR_GDP$samples[,c("sigma2")],main="posterior sigma^2")
+plot(outputmcmcAR_GDP$samples[,c("sigma2")],main="posterior sigma^2")
 ```
 
 ## AR(1) model Inflation
@@ -200,7 +203,7 @@ yp_pred=outputmcmcAR_INF$mean$ypOut
 q1_pred=outputmcmcAR_INF$q2.5$ypOut
 q2_pred=outputmcmcAR_INF$q97.5$ypOut
 #
-plot(t,gdpData,col="red",ylab="mu_t",ylim=c(min(q1_pred),max(q2_pred)),
+plot(t,infData,col="red",ylab="mu_t",ylim=c(min(q1_pred),max(q2_pred)),
      main= "out-of-sample prediction (orange)")
 abline(v=N,col="orange")
 lines(tt,yp,type="p",pch="*",col="blue",)
@@ -213,6 +216,6 @@ lines(seq((N+1),Ntot,1),q2_pred,col="orange",lwd = 1.5)
 ```{r}
 plot(outputmcmcAR_INF$samples[,c("alpha")]
 ,main="posterior alpha")
-#plot(outputmcmcAR_INF$samples[,c("sigma2")],main="posterior sigma^2")
+plot(outputmcmcAR_INF$samples[,c("sigma2")],main="posterior sigma^2")
 ```
 

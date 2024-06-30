@@ -1,0 +1,135 @@
+---
+title: "Final project ataset: 2024"
+output: html_document
+date: "2024-05-14"
+---
+
+```{r}
+rm(list=ls())
+library(rjags)
+library(bayesplot)
+library(jagsUI)
+```
+
+# 6. GDP & INFLATION US
+
+The data consists in two time series:
+
+Gross Domestic Product (GDP) 
+
+Consumer Price Index for All Urban Consumers: All Items in U.S. City Average (CPIAUCSL)
+
+(more info in the additional file)
+
+Task. Fit some time series models for the two series (separately). You can to try  AR,MA,GARCH or ARMA. In case you use more model, compare the models 
+with some Information criteria (BIC,DIC,WAIC). 
+You can also  try a bivariate time series models, e.g. a simple VAR(1) model (in this case, ask to the teacher for more information). 
+
+
+
+```{r}
+rm(list=ls())
+
+# New Family Houses Sold: United States
+# Source: https://fred.stlouisfed.org/series/HSN1F
+
+data = read.csv("data/gdp_inflation.csv",header=T)
+data$DATE = as.Date(data$DATE)
+gdpData = data$GDP_PC1[1:305]
+infData = data$CPIAUCSL_PC1[1:305]
+sum(is.na(data$GDP_PC1)) #conta i valori mancanti(NA) in gdp
+plot(data$DATE[1:305],gdpData,type="l",xlab="",ylab="GDP",main="GDP+INFL")
+lines(data$DATE[1:305],infData,type="l",col="red")
+#data$CPIAUCSL_PC1
+#data1=as.numeric(data$GDP_PC1[1:305])
+```
+
+## Moving Average (1)
+```{r}
+modelMA.string <-"
+model {
+  ## parameters: alpha, tau, m0
+  
+  # likelihood 
+  for (i in 1:N) {
+    e[i] ~ dnorm(0, tau)
+  }
+  
+  mu[1] <- m0 + e[1]
+  Yp[1] <- mu[1]
+  
+  for (i in 2:N) {
+    Y[i] ~ dnorm(mu[i], tau)
+    mu[i] <- m0 + alpha * e[i-1] + e[i]
+    Yp[i] ~ dnorm(mu[i], tau) # prediction in sample
+  }
+  
+  # prediction out of sample 
+  e_pred[1] ~ dnorm(0, tau)
+  ypOut[1] ~ dnorm(m0 + alpha * e[N] + e_pred[1], tau)
+  
+  for (k in 2:Npred) {
+    e_pred[k] ~ dnorm(0, tau)
+    ypOut[k] ~ dnorm(m0 + alpha * e_pred[k-1] + e_pred[k], tau)
+  }
+  
+  sigma2 <- 1 / tau
+  
+  # priors 
+  alpha ~ dunif(-1.5, 1.5)
+  tau ~ dgamma(0.1, 0.1) # Adjusted the parameters for a reasonable prior
+  m0 ~ dnorm(0.0, 1.0E-4)
+
+}"
+```
+
+```{r}
+# prepare the data 
+gdpData = as.numeric(gdpData)
+Ntot=length(gdpData)
+Npred=20 # horizon for out-of-sample prediction
+N=Ntot-Npred
+data_subsample=gdpData[1:N]
+
+line_data <- list("Y" =data_subsample,"N" = length(data_subsample),"Npred"=Npred)
+
+outputmcmcMA_GDP <- jags(model.file=textConnection(modelMA.string),
+                     data=line_data,
+                     parameters.to.save= c('alpha',"sigma2","m0","Yp","ypOut"), 
+                     n.adapt=1000, n.iter=10000,n.chains = 1,n.burnin = 2000)
+
+```
+
+```{r}
+
+t=seq(1,Ntot)
+tt=seq(1,N)
+#
+yp=outputmcmcMA_GDP$mean$Yp
+q1=outputmcmcMA_GDP$q2.5$Yp
+q2=outputmcmcMA_GDP$q97.5$Yp
+#
+
+plot(t,gdpData,col="red",ylab="mu_t",main="data (red), true pred. means (magenta), in samp.pred. (blue)")
+lines(t,gdpData,col="red")
+points(tt,yp,pch="*",col="blue")
+lines(tt,q1,type="l",col="blue",lwd = 1.5)
+lines(tt,q2,type="l",col="blue",lwd = 1.5)
+#
+yp_pred=outputmcmcMA_GDP$mean$ypOut
+q1_pred=outputmcmcMA_GDP$q2.5$ypOut
+q2_pred=outputmcmcMA_GDP$q97.5$ypOut
+#
+plot(t,gdpData,col="red",ylab="mu_t",ylim=c(min(q1_pred),max(q2_pred)),
+     main= "out-of-sample prediction (orange)")
+lines(t,gdpData,col="red")
+abline(v=N,col="orange")
+
+lines(tt,yp,type="p",pch="*",col="blue",)
+lines(tt,q1,type="l",col="blue",lwd = 1.5)
+lines(tt,q2,type="l",col="blue",lwd = 1.5)
+points(seq((N+1),Ntot,1),pch="*",yp_pred,col="orange")
+lines(seq((N+1),Ntot,1),q1_pred,col="orange",lwd = 1.5)
+lines(seq((N+1),Ntot,1),q2_pred,col="orange",lwd = 1.5)
+
+```
