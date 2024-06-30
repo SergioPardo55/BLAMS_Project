@@ -133,3 +133,55 @@ lines(seq((N+1),Ntot,1),q1_pred,col="orange",lwd = 1.5)
 lines(seq((N+1),Ntot,1),q2_pred,col="orange",lwd = 1.5)
 
 ```
+
+```{r}
+# prepare the data 
+infData = as.numeric(infData)
+Ntot=length(infData)
+Npred=20 # horizon for out-of-sample prediction
+N=Ntot-Npred
+data_subsample=infData[1:N]
+
+line_data <- list("Y" =data_subsample,"N" = length(data_subsample),"Npred"=Npred)
+
+outputmcmcMA_INF <- jags(model.file=textConnection(modelMA.string),
+                     data=line_data,
+                     parameters.to.save= c('alpha',"sigma2","m0","Yp","ypOut"), 
+                     n.adapt=1000, n.iter=10000,n.chains = 1,n.burnin = 2000)
+
+```
+
+```{r}
+
+t=seq(1,Ntot)
+tt=seq(1,N)
+#
+yp=outputmcmcMA_INF$mean$Yp
+q1=outputmcmcMA_INF$q2.5$Yp
+q2=outputmcmcMA_INF$q97.5$Yp
+#
+
+plot(t,infData,col="red",ylab="mu_t",main="data (red), true pred. means (magenta), in samp.pred. (blue)")
+lines(t,infData,col="red")
+points(tt,yp,pch="*",col="blue")
+lines(tt,q1,type="l",col="blue",lwd = 1.5)
+lines(tt,q2,type="l",col="blue",lwd = 1.5)
+#
+yp_pred=outputmcmcMA_INF$mean$ypOut
+q1_pred=outputmcmcMA_INF$q2.5$ypOut
+q2_pred=outputmcmcMA_INF$q97.5$ypOut
+#
+plot(t,infData,col="red",ylab="mu_t",ylim=c(min(q1_pred),max(q2_pred)),
+     main= "out-of-sample prediction (orange)")
+lines(t,infData,col="red")
+abline(v=N,col="orange")
+
+lines(tt,yp,type="p",pch="*",col="blue",)
+lines(tt,q1,type="l",col="blue",lwd = 1.5)
+lines(tt,q2,type="l",col="blue",lwd = 1.5)
+points(seq((N+1),Ntot,1),pch="*",yp_pred,col="orange")
+lines(seq((N+1),Ntot,1),q1_pred,col="orange",lwd = 1.5)
+lines(seq((N+1),Ntot,1),q2_pred,col="orange",lwd = 1.5)
+
+```
+
