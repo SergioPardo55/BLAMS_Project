@@ -9,6 +9,7 @@ rm(list=ls())
 library(rjags)
 library(bayesplot)
 library(jagsUI)
+library(loo)
 ```
 
 
@@ -66,10 +67,12 @@ modelAR.string <-"model {
   #likeliohood 
   mu[1]<-Y[1]
   Yp[1]=mu[1]
+  LogLik[1] = 0
   for (i in 2:N) {
     mu[i]<-m0+alpha*Y[i-1]
     Y[i] ~ dnorm(mu[i],tau)
     Yp[i] ~ dnorm(mu[i],tau) # prediction in sample
+    LogLik[i] <- log(dnorm( Y[i],mu[i],tau))
   }
   # prediction out of sample 
   ypOut[1] ~dnorm(m0+alpha*Y[N],tau) 
@@ -99,7 +102,7 @@ line_data <- list("Y" =data_subsample,"N" = length(data_subsample),"Npred"=Npred
 
 outputmcmcAR_GDP <- jags(model.file=textConnection(modelAR.string),
                      data=line_data,
-                     parameters.to.save= c('alpha',"sigma2","m0","Yp","ypOut"), 
+                     parameters.to.save= c('alpha',"sigma2","m0","Yp","ypOut","LogLik" ), 
                      n.adapt=1000, n.iter=10000,n.chains = 1,n.burnin = 2000)
 
 ```
@@ -142,6 +145,16 @@ lines(seq((N+1),Ntot,1),q1_pred,col="orange",lwd = 1.5)
 lines(seq((N+1),Ntot,1),q2_pred,col="orange",lwd = 1.5)
 ```
 ```{r}
+loglik=outputmcmcAR_GDP$sims.list$LogLik # model without change point
+print(length(loglik))
+print(loglik)
+waic<- waic(loglik)
+print(waic)
+#loo_result <- loo(loglik)
+#print(loo_result)
+
+
+
 plot(outputmcmcAR_GDP$samples[,c("alpha")]
 ,main="posterior alpha")
 plot(outputmcmcAR_GDP$samples[,c("sigma2")],main="posterior sigma^2")
