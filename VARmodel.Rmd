@@ -1,0 +1,236 @@
+---
+title: "Final project dataset: 2024"
+output: html_document
+date: "2024-05-14"
+---
+
+```{r}
+rm(list=ls())
+library(rjags)
+library(bayesplot)
+library(jagsUI)
+library(loo)
+```
+
+
+```{r}
+rm(list=ls())
+# Source: https://fred.stlouisfed.org/series/HSN1F
+
+data = read.csv("data/gdp_inflation.csv",header=T)
+data$DATE = as.Date(data$DATE)
+gdpData = data$GDP_PC1[1:305]
+infData = data$CPIAUCSL_PC1[1:305]
+sum(is.na(data$GDP_PC1))
+plot(data$DATE[1:305],gdpData,type="l",xlab="",ylab="GDP",main="GDP+INFL")
+lines(data$DATE[1:305],infData,type="l",col="red")
+summary(data)
+
+```
+
+## VAR(1) model INF
+
+```{r}
+modelVAR.string <- "model {
+   ## parameters:  a11, a12, a21, a22, [m01 m02]
+   
+   #likelihood
+   mu[1:2,1]<- Y[1:2,1]
+   Yp[1:2,1]<- mu[1:2,1]
+   for (i in 2:N) {
+      mu[1,i]<- m0[1] + (a11*Y[1,i-1]) + (a12*Y[2, i-1])
+      mu[2,i]<- m0[2] + (a21*Y[1, i-1]) +(a22*Y[2, i-1])
+      Y[1:2,i] ~ dmnorm(mu[1:2,i], omega[1:2,1:2])
+      Yp[1:2,i] ~ dmnorm(mu[1:2,i], omega)
+   }
+   #prediction out of sample
+   mp[1,1]<- m0[1] + (a11* Y[1,N]) + (a12*Y[2,N])
+   mp[2,1]<- m0[2] + (a21*Y[2,N]) + (a22*Y[2,N])
+   ypOut[1:2,1] ~ dmnorm(mp[1:2,1], omega)
+   for ( k in 2:Npred){
+      mp[1,k]<- m0[1] +(a11*ypOut[1,k-1]) + (a12 * ypOut[2,k-1])
+      mp[2,k]<- m0[2] +(a21*ypOut[1,k-1]) + (a22*ypOut[2,k-1])
+      ypOut[1:2,k] ~ dmnorm(mp[1:2,k], omega)
+   }
+   # priors
+   a11 ~ dunif(-1.5, 1.5)
+   a12 ~ dunif(-1.5, 1.5)
+   a21 ~ dunif(-1.5, 1.5)
+   a22 ~ dunif(-1.5, 1.5)
+   m<- 3
+   omega ~ dwish(R,m)
+   m0 ~ dmnorm(vec, S)
+
+}"
+```
+
+
+
+modelAR.string <-"model {
+  ## parameters: alpha,tau,m0
+  #likeliohood 
+  mu[1]<-Y[1]
+  Yp[1]=mu[1]
+  LogLik[1] = 0
+  for (i in 2:N) {
+    mu[i]<-m0+alpha*Y[i-1]
+    Y[i] ~ dnorm(mu[i],tau)
+    Yp[i] ~ dnorm(mu[i],tau) # prediction in sample
+    LogLik[i] <- log(dnorm( Y[i],mu[i],tau))
+  }
+  # prediction out of sample 
+  ypOut[1] ~dnorm(m0+alpha*Y[N],tau) 
+  for(k in 2:Npred){
+  ypOut[k] ~dnorm(m0+alpha*ypOut[k-1],tau) 
+  }
+  sigma2<-1/tau
+  #prior 
+  alpha ~ dunif(-1.5,1.5)
+  tau ~ dgamma(0.1, 10)
+  m0 ~dnorm(0.0, 1.0E-4)
+}"
+```{r}
+
+
+
+gdpData = as.numeric(gdpData)
+infData = as.numeric(infData)
+data = rbind(gdpData, infData)
+Ntot = length(gdpData)-1
+Npred=30 # horizon for out-of-sample prediction
+N=Ntot-Npred
+data_sub_gdp=gdpData[1:N]
+data_sub_inf=infData[1:N]
+data_subsample= rbind(data_sub_gdp, data_sub_inf)
+print(data_subsample[1:2, 1:5])
+print(dim(data_subsample))
+
+R <- matrix(0, nrow = 2, ncol = 2)
+R[1,1]<- 5
+R[2,2]<- 5
+
+S <- matrix(0, nrow = 2, ncol = 2)
+S[1,1]<-0.2
+S[2,2]<-0.2
+vec = c(0,0)
+print(N)
+
+line_data <- list("Y" = data_subsample, "N" = N, "Npred"=Npred, "R"= R, "S" = S, "vec"= vec)
+
+outputVAR <- jags(model.file=textConnection(modelVAR.string),
+                  data = line_data,
+                  parameters.to.save = c("a11", "a12", "a21", "a22", "m0","Yp", "ypOut"),
+                  n.adapt = 1000, n.iter = 10000, n.chains = 1, n.burnin = 2000
+)
+
+
+
+```
+
+
+```{r}
+t=seq(1,Ntot+1)
+tt=seq(1,N)
+yp_gdp = outputVAR$mean$Yp[1,]
+yp_inf = outputVAR$mean$Yp[2,]
+q1_gdp = outputVAR$q2.5$Yp[1,]
+q2_gdp = outputVAR$q97.5$Yp[1,]
+q1_inf = outputVAR$q2.5$Yp[2,]
+q2_inf = outputVAR$q97.5$Yp[2,]
+
+plot(t, gdpData, col="red",ylab = "annual growth rate", main = " gdp data (red), gdp sample prediction (blue)" )
+lines(t, gdpData, col = "red")
+points(tt, yp_gdp, pch = "*", col = "blue")
+lines(tt, q1_gdp, type = "l", col = "blue", lwd = 1.5)
+lines(tt, q2_gdp, type = "l", col = "blue", lwd = 1.5)
+
+yp_gdp_pred = outputVAR$mean$ypOut[1,]
+q1_pred_gdp =outputVAR$q2.5$ypOut[1,]
+q2_pred_gdp =outputVAR$q97.5$ypOut[1,]
+yp_inf_pred = outputVAR$mean$ypOut[2,]
+q1_pred_inf = outputVAR$q2.5$ypOut[2,]
+q2_pred_inf = outputVAR$q97.5$ypOut[2,]
+
+plot(t,gdpData,col="red",ylab="annual growth rate",ylim=c(min(q1_pred_gdp),max(q2_pred_gdp)),
+     main= "out-of-sample prediction (orange)")
+abline(v=N,col="orange")
+lines(tt,yp_gdp,type="p",pch="*",col="blue")
+lines(tt,q1_gdp,type="l",col="blue",lwd = 1.5)
+lines(tt,q2_gdp,type="l",col="blue",lwd = 1.5)
+points(seq((N+1),Ntot,1),pch="*",yp_gdp_pred,col="orange")
+lines(seq((N+1),Ntot,1),q1_pred_gdp,col="orange",lwd = 1.5)
+lines(seq((N+1),Ntot,1),q2_pred_gdp,col="orange",lwd = 1.5)
+
+plot(t, infData, col = "deeppink", ylab = "annual growth rate of Inf",main = "inf data (magenta), inf sample pred (purple)")
+lines(t, infData, col = "deeppink")
+points(tt, yp_inf, pch = "*", col = "springgreen")
+lines(tt, q1_inf, type = "l", col = "springgreen", lwd = 1.5)
+lines(tt, q2_inf, type = "l", col = "springgreen", lwd = 1.5)
+
+plot(t, infData, col = "deeppink", ylab = "annual growth rate", ylim = c(min(q1_pred_inf), max(q2_pred_inf)),
+     main = "out of sample prediction (orange)" )
+abline(v = N, col = "orange")
+lines (tt, yp_inf, type = "p", pch = "*", col = "springgreen")
+lines(tt, q1_inf, type = "l", col = "springgreen", lwd = 1.5)
+lines(tt, q2_inf, type = "l", col = "springgreen", lwd = 1.5)
+points(seq((N+1), Ntot, 1), pch = "*", yp_inf_pred, col = "orange" )
+lines(seq((N+1), Ntot,1), q1_pred_inf, col = "orange", lwd = 1.5)
+lines(seq((N+1), Ntot,1), q2_pred_inf, col = "orange", lwd = 1.5)
+
+
+
+
+
+
+#plot(outputVAR)
+
+```
+
+
+t=seq(1,Ntot+1)
+tt=seq(1,N)
+#
+yp=outputmcmcAR_GDP$mean$Yp
+q1=outputmcmcAR_GDP$q2.5$Yp
+q2=outputmcmcAR_GDP$q97.5$Yp
+#
+alpha_true = 0.9
+mtrue = mean(gdpData)
+mutrue=alpha_true*gdpData+mtrue
+mutrue=c(0,mutrue)
+mutrue=mutrue[1:Ntot]
+#
+plot(t,gdpData,col="red",ylab="mu_t",
+     main="data (red), true pred. means (magenta), in samp.pred. (blue)")
+lines(t,gdpData,col="red")
+lines(tt,mutrue[1:N],col="magenta",type="p")
+points(tt,yp,pch="*",col="blue")
+lines(tt,q1,type="l",col="blue",lwd = 1.5)
+lines(tt,q2,type="l",col="blue",lwd = 1.5)
+#
+yp_pred=outputmcmcAR_GDP$mean$ypOut
+q1_pred=outputmcmcAR_GDP$q2.5$ypOut
+q2_pred=outputmcmcAR_GDP$q97.5$ypOut
+#
+plot(t,gdpData,col="red",ylab="mu_t",ylim=c(min(q1_pred),max(q2_pred)),
+     main= "out-of-sample prediction (orange)")
+abline(v=N,col="orange")
+lines(tt,yp,type="p",pch="*",col="blue",)
+lines(tt,q1,type="l",col="blue",lwd = 1.5)
+lines(tt,q2,type="l",col="blue",lwd = 1.5)
+points(seq((N+1),Ntot,1),pch="*",yp_pred,col="orange")
+lines(seq((N+1),Ntot,1),q1_pred,col="orange",lwd = 1.5)
+lines(seq((N+1),Ntot,1),q2_pred,col="orange",lwd = 1.5)
+
+
+plot(outputmcmcAR_GDP$samples[,c("alpha")]
+,main="posterior alpha")
+plot(outputmcmcAR_GDP$samples[,c("sigma2")],main="posterior sigma^2")
+```
+
+
+
+
+
+
+
