@@ -317,13 +317,6 @@ autocorr.plot(outputmcmcAR2_GDP$samples[,c("sigma2")],main="sigma2 ACF")
 
 ## AR(2) model Inflation
 
-An AR(1) model is a time series model defined as follows. Starting 
-from $y_1$ one recursively define for $t \geq 1$
-\[
-y_{t+1}=\mu+\alpha y_t +\epsilon_t \qquad 
-\epsilon_t \stackrel{iid}{\sim} \mathcal{N}(0,\sigma^2)
-\]
-
 ```{r}
 
 # prepare the data 
@@ -593,7 +586,7 @@ dic_AR2INF
 According to both, the results of the BIC and the DIC for the proposed models, it is reasonable to state that the AR(1) model fits best the data available since it overfits it less, while maintaining more or less the same effectivity on the prediction.
 
 
-# ARMA(1,1) Model
+# ARMA Models
 
 ```{r}
 modelARMA.string <-"
