@@ -227,16 +227,19 @@ modelAR2.string <-"model {
   Yp[1]=mu[1]
   mu[2]<-Y[2]
   Yp[2]=mu[2]
+  LogLik[1] = 0
+  LogLik[2] = 0
   for (i in 3:N) {
     Y[i] ~ dnorm(mu[i],tau)
     mu[i]<-m0+alpha*Y[i-1]+beta*Y[i-2]
     Yp[i] ~ dnorm(mu[i],tau) # prediction in sample
+    LogLik[i] <- log(dnorm( Y[i],mu[i],tau))
   }
   # prediction out of sample 
   ypOut[1] ~dnorm(m0+alpha*Y[N]+beta*Y[N-1],tau)
   ypOut[2] ~dnorm(m0+alpha*ypOut[1]+beta*Y[N],tau)
   for(k in 3:Npred){
-  ypOut[k] ~dnorm(m0+alpha*ypOut[k-1]+beta*ypOut[k-2],tau) 
+    ypOut[k] ~dnorm(m0+alpha*ypOut[k-1]+beta*ypOut[k-2],tau) 
   }
   sigma2<-1/tau
   #prior 
@@ -259,7 +262,7 @@ line_data <- list("Y" =data_subsample,"N" = length(data_subsample),"Npred"=Npred
 
 outputmcmcAR2_GDP <- jags(model.file=textConnection(modelAR2.string),
                      data=line_data,
-                     parameters.to.save= c('alpha','beta',"sigma2","m0","Yp","ypOut", "LokLik"), 
+                     parameters.to.save= c('alpha','beta',"sigma2","m0","Yp","ypOut", "LogLik"), 
                      n.adapt=1000, n.iter=10000,n.chains = 1,n.burnin = 2000)
 
 ```
@@ -555,11 +558,28 @@ GDPAR1_waic<- waic(loglik)
 print(GDPAR1_waic)
 ```
 ```{r}
-### Calcolo del WAIC per GDP AR(2)
+### Calcolo del WAIC per CPI AR(1)
 loglik=outputmcmcAR_INF$sims.list$LogLik # model without change point
 print(length(loglik))
 INFAR1_waic<- waic(loglik)
 print(INFAR1_waic)
+```
+
+```{r}
+### Calcolo del WAIC per GDP AR(2)
+loglik<- outputmcmcAR2_GDP$sims.list$LogLik # model without change point
+print(length(loglik))
+sum(is.na(loglik))
+GDPAR2_waic<- waic(loglik)
+print(GDPAR2_waic)
+```
+```{r}
+### Calcolo del WAIC per CPI AR(2)
+loglik=outputmcmcAR2_INF$sims.list$LogLik # model without change point
+print(length(loglik))
+
+INFAR2_waic<- waic(loglik)
+print(INFAR2_waic)
 ```
 
 ```{r}
