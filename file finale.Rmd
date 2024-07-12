@@ -1,0 +1,991 @@
+---
+title: "Final project ataset: 2024"
+output: html_document
+date: "2024-05-14"
+---
+
+```{r}
+rm(list=ls())
+library(rjags)
+library(bayesplot)
+library(jagsUI)
+library(loo)
+```
+
+# 6. GDP & INFLATION US
+
+The data consists in two time series:
+
+Gross Domestic Product (GDP) 
+
+Consumer Price Index for All Urban Consumers: All Items in U.S. City Average (CPIAUCSL)
+
+(more info in the additional file)
+
+Task. Fit some time series models for the two series (separately). You can to try  AR,MA,GARCH or ARMA. In case you use more model, compare the models 
+with some Information criteria (BIC,DIC,WAIC). 
+You can also  try a bivariate time series models, e.g. a simple VAR(1) model (in this case, ask to the teacher for more information). 
+
+```{r}
+# New Family Houses Sold: United States
+# Source: https://fred.stlouisfed.org/series/HSN1F
+
+data = read.csv("data/gdp_inflation.csv",header=T)
+data$DATE = as.Date(data$DATE)
+gdpData = data$GDP_PC1[1:305]
+infData = data$CPIAUCSL_PC1[1:305]
+sum(is.na(data$GDP_PC1)) #conta i valori mancanti(NA) in gdp
+plot(data$DATE[1:305],gdpData,type="l",xlab="",ylab="GDP",main="GDP+INFL")
+lines(data$DATE[1:305],infData,type="l",col="red")
+#data$CPIAUCSL_PC1
+#data1=as.numeric(data$GDP_PC1[1:305])
+```
+
+# AR(1) Models
+
+An AR(1) model is a time series model defined as follows. Starting 
+from $y_1$ one recursively define for $t \geq 1$
+\[
+y_{t+1}=\mu+\alpha y_t +\epsilon_t \qquad 
+\epsilon_t \stackrel{iid}{\sim} \mathcal{N}(0,\sigma^2)
+\]
+
+
+```{r}
+modelAR.string <-"model {
+  ## parameters: alpha,tau,m0
+  #likeliohood 
+  mu[1]<-Y[1]
+  Yp[1]=mu[1]
+  LogLik[1] = 0
+  for (i in 2:N) {
+    Y[i] ~ dnorm(mu[i],tau)
+    mu[i]<-m0+alpha*Y[i-1]
+    Yp[i] ~ dnorm(mu[i],tau) # prediction in sample
+    LogLik[i] <- log(dnorm( Y[i],mu[i],tau))
+  }
+  # prediction out of sample 
+  ypOut[1] ~dnorm(m0+alpha*Y[N],tau) 
+  for(k in 2:Npred){
+  ypOut[k] ~dnorm(m0+alpha*ypOut[k-1],tau) 
+  }
+  sigma2<-1/tau
+  #prior 
+  alpha ~ dunif(-1.5,1.5)
+  tau ~ dgamma(0.1, 10)
+  m0 ~dnorm(0.0, 1.0E-4)
+}"
+```
+
+```{r}
+
+# prepare the data 
+gdpData = as.numeric(gdpData)
+Ntot=length(gdpData)
+Npred=100 # horizon for out-of-sample prediction
+N=Ntot-Npred
+data_subsample=gdpData[1:N]
+
+line_data <- list("Y" =data_subsample,"N" = length(data_subsample),"Npred"=Npred)
+
+outputmcmcAR_GDP <- jags(model.file=textConnection(modelAR.string),
+                     data=line_data,
+                     parameters.to.save= c('alpha',"sigma2","m0","Yp","ypOut","LogLik"), 
+                     n.adapt=1000, n.iter=10000,n.chains = 1,n.burnin = 2000)
+
+```
+## AR(1) model GDP
+
+```{r}
+t=seq(1,Ntot)
+tt=seq(1,N)
+#
+yp=outputmcmcAR_GDP$mean$Yp
+q1=outputmcmcAR_GDP$q2.5$Yp
+q2=outputmcmcAR_GDP$q97.5$Yp
+#
+
+alpha_hatg = outputmcmcAR_GDP$mean$alpha
+m0_hatg = outputmcmcAR_GDP$mean$m0
+#
+
+plot(t,gdpData,col="red",ylab="mu_t",
+     main="data (red), in samp.pred. (blue)")
+lines(t,gdpData,col="red")
+points(tt,yp,pch="*",col="blue")
+lines(tt,q1,type="l",col="blue",lwd = 1.5)
+lines(tt,q2,type="l",col="blue",lwd = 1.5)
+#
+yp_pred=outputmcmcAR_GDP$mean$ypOut
+q1_pred=outputmcmcAR_GDP$q2.5$ypOut
+q2_pred=outputmcmcAR_GDP$q97.5$ypOut
+q11_pred=outputmcmcAR_GDP$q25$ypOut
+q22_pred=outputmcmcAR_GDP$q75$ypOut
+#
+plot(t,gdpData,col="red",ylab="mu_t",ylim=c(min(q1),max(q2)),
+     main= "out-of-sample prediction (orange)")
+lines(t,gdpData,col="red")
+abline(v=N,col="orange")
+lines(tt,yp,type="p",pch="*",col="blue",)
+lines(tt,q1,type="l",col="blue",lwd = 1.5)
+lines(tt,q2,type="l",col="blue",lwd = 1.5)
+points(seq((N+1),Ntot,1),pch="*",yp_pred,col="orange")
+lines(seq((N+1),Ntot,1),q1_pred,col="orange",lwd = 1.5)
+lines(seq((N+1),Ntot,1),q2_pred,col="orange",lwd = 1.5)
+lines(seq((N+1),Ntot,1),q11_pred,col="orange",lty=2,lwd = 1.5)
+lines(seq((N+1),Ntot,1),q22_pred,col="orange",lty=2,lwd = 1.5)
+```
+```{r}
+plot(outputmcmcAR_GDP$samples[,c("alpha")],main="posterior alpha")
+plot(outputmcmcAR_GDP$samples[,c("sigma2")],main="posterior sigma^2")
+```
+```{r}
+autocorr.plot(outputmcmcAR_GDP$samples[,c("alpha")],main="alpha ACF")
+autocorr.plot(outputmcmcAR_GDP$samples[,c("sigma2")],main="sigma2 ACF")
+```
+
+## AR(1) model Inflation
+
+```{r}
+
+# prepare the data 
+infData = as.numeric(infData)
+Ntot=length(infData)
+Npred=50 # horizon for out-of-sample prediction
+N=Ntot-Npred
+data_subsample=infData[1:N]
+
+line_data <- list("Y" =data_subsample,"N" = length(data_subsample),"Npred"=Npred)
+
+outputmcmcAR_INF <- jags(model.file=textConnection(modelAR.string),
+                     data=line_data,
+                     parameters.to.save= c('alpha',"sigma2","m0","Yp","ypOut","LogLik"), 
+                     n.adapt=1000, n.iter=10000,n.chains = 1,n.burnin = 2000)
+
+```
+
+```{r}
+t=seq(1,Ntot)
+tt=seq(1,N)
+#
+yp=outputmcmcAR_INF$mean$Yp
+q1=outputmcmcAR_INF$q2.5$Yp
+q2=outputmcmcAR_INF$q97.5$Yp
+#
+
+alpha_hati = outputmcmcAR_INF$mean$alpha
+m0_hati = outputmcmcAR_INF$mean$m0
+#
+plot(t,infData,col="red",ylab="mu_t",main="data (red), in samp.pred. (blue)")
+lines(t,infData,col="red")
+points(tt,yp,pch="*",col="blue")
+lines(tt,q1,type="l",col="blue",lwd = 1.5)
+lines(tt,q2,type="l",col="blue",lwd = 1.5)
+#
+yp_pred=outputmcmcAR_INF$mean$ypOut
+q1_pred=outputmcmcAR_INF$q2.5$ypOut
+q2_pred=outputmcmcAR_INF$q97.5$ypOut
+#
+plot(t,infData,col="red",ylab="mu_t",ylim=c(min(q1_pred),max(q2_pred)),
+     main= "out-of-sample prediction (orange)")
+lines(t,infData,col="red")
+abline(v=N,col="orange")
+
+lines(tt,yp,type="p",pch="*",col="blue",)
+lines(tt,q1,type="l",col="blue",lwd = 1.5)
+lines(tt,q2,type="l",col="blue",lwd = 1.5)
+points(seq((N+1),Ntot,1),pch="*",yp_pred,col="orange")
+lines(seq((N+1),Ntot,1),q1_pred,col="orange",lwd = 1.5)
+lines(seq((N+1),Ntot,1),q2_pred,col="orange",lwd = 1.5)
+```
+```{r}
+plot(outputmcmcAR_INF$samples[,c("alpha")]
+     ,main="posterior alpha")
+plot(outputmcmcAR_INF$samples[,c("sigma2")],main="posterior sigma^2")
+```
+
+
+```{r}
+autocorr.plot(outputmcmcAR_INF$samples[,c("alpha")],main="alpha ACF")
+autocorr.plot(outputmcmcAR_INF$samples[,c("sigma2")],main="sigma2 ACF")
+```
+
+# AR(2) model
+
+On the other hand an AR(2) model is a time series model defined as follows. Starting 
+from $y_2$ one recursively define for $t \geq 2$
+\[
+y_{t+1}=\mu+\alpha y_t + \beta y_{t-1}+\epsilon_t  \qquad 
+\epsilon_t \stackrel{iid}{\sim} \mathcal{N}(0,\sigma^2)
+\]
+
+```{r}
+modelAR2.string <-"model {
+  ## parameters: alpha,tau,m0
+  #likeliohood 
+  mu[1]<-Y[1]
+  Yp[1]=mu[1]
+  mu[2]<-Y[2]
+  Yp[2]=mu[2]
+  LogLik[1] = 0
+  LogLik[2] = 0
+  for (i in 3:N) {
+    Y[i] ~ dnorm(mu[i],tau)
+    mu[i]<-m0+alpha*Y[i-1]+beta*Y[i-2]
+    Yp[i] ~ dnorm(mu[i],tau) # prediction in sample
+    LogLik[i] <- log(dnorm( Y[i],mu[i],tau))
+  }
+  # prediction out of sample 
+  ypOut[1] ~dnorm(m0+alpha*Y[N]+beta*Y[N-1],tau)
+  ypOut[2] ~dnorm(m0+alpha*ypOut[1]+beta*Y[N],tau)
+  for(k in 3:Npred){
+    ypOut[k] ~dnorm(m0+alpha*ypOut[k-1]+beta*ypOut[k-2],tau) 
+  }
+  sigma2<-1/tau
+  #prior 
+  alpha ~ dunif(-1.5,1.5)
+  beta ~ dunif(-1.5,1.5)
+  tau ~ dgamma(0.1, 10)
+  m0 ~dnorm(0.0, 1.0E-4)
+}"
+```
+
+```{r}
+
+# prepare the data 
+Ntot=length(gdpData)
+Npred=50 # horizon for out-of-sample prediction
+N=Ntot-Npred
+data_subsample=gdpData[1:N]
+
+line_data <- list("Y" =data_subsample,"N" = length(data_subsample),"Npred"=Npred)
+
+outputmcmcAR2_GDP <- jags(model.file=textConnection(modelAR2.string),
+                     data=line_data,
+                     parameters.to.save= c('alpha','beta',"sigma2","m0","Yp","ypOut", "LogLik"), 
+                     n.adapt=1000, n.iter=10000,n.chains = 1,n.burnin = 2000)
+
+```
+
+
+```{r}
+t=seq(1,Ntot)
+tt=seq(1,N)
+#
+yp=outputmcmcAR2_GDP$mean$Yp
+q1=outputmcmcAR2_GDP$q2.5$Yp
+q2=outputmcmcAR2_GDP$q97.5$Yp
+#
+
+alpha_hatg = outputmcmcAR2_GDP$mean$alpha
+m0_hatg = outputmcmcAR2_GDP$mean$m0
+#
+
+plot(t,gdpData,col="red",ylab="mu_t",
+     main="data (red), in samp.pred. (blue)")
+lines(t,gdpData,col="red")
+points(tt,yp,pch="*",col="blue")
+lines(tt,q1,type="l",col="blue",lwd = 1.5)
+lines(tt,q2,type="l",col="blue",lwd = 1.5)
+#
+yp_pred=outputmcmcAR2_GDP$mean$ypOut
+q1_pred=outputmcmcAR2_GDP$q2.5$ypOut
+q2_pred=outputmcmcAR2_GDP$q97.5$ypOut
+q11_pred=outputmcmcAR2_GDP$q25$ypOut
+q22_pred=outputmcmcAR2_GDP$q75$ypOut
+#
+plot(t,gdpData,col="red",ylab="mu_t",ylim=c(min(q1),max(q2)),
+     main= "out-of-sample prediction (orange)")
+lines(t,gdpData,col="red")
+abline(v=N,col="orange")
+lines(tt,yp,type="p",pch="*",col="blue",)
+lines(tt,q1,type="l",col="blue",lwd = 1.5)
+lines(tt,q2,type="l",col="blue",lwd = 1.5)
+points(seq((N+1),Ntot,1),pch="*",yp_pred,col="orange")
+lines(seq((N+1),Ntot,1),q1_pred,col="orange",lwd = 1.5)
+lines(seq((N+1),Ntot,1),q2_pred,col="orange",lwd = 1.5)
+lines(seq((N+1),Ntot,1),q11_pred,col="orange",lty=2,lwd = 1.5)
+lines(seq((N+1),Ntot,1),q22_pred,col="orange",lty=2,lwd = 1.5)
+```
+```{r}
+plot(outputmcmcAR2_GDP$samples[,c("alpha")],main="posterior alpha")
+plot(outputmcmcAR2_GDP$samples[,c("beta")],main="posterior beta")
+plot(outputmcmcAR2_GDP$samples[,c("sigma2")],main="posterior sigma^2")
+```
+```{r}
+autocorr.plot(outputmcmcAR2_GDP$samples[,c("alpha")],main="alpha ACF")
+autocorr.plot(outputmcmcAR2_GDP$samples[,c("beta")],main="beta ACF")
+autocorr.plot(outputmcmcAR2_GDP$samples[,c("sigma2")],main="sigma2 ACF")
+```
+
+## AR(2) model Inflation
+
+An AR(1) model is a time series model defined as follows. Starting 
+from $y_1$ one recursively define for $t \geq 1$
+\[
+y_{t+1}=\mu+\alpha y_t +\epsilon_t \qquad 
+\epsilon_t \stackrel{iid}{\sim} \mathcal{N}(0,\sigma^2)
+\]
+
+```{r}
+
+# prepare the data 
+Ntot=length(infData)
+Npred=50 # horizon for out-of-sample prediction
+N=Ntot-Npred
+data_subsample=infData[1:N]
+
+line_data <- list("Y" =data_subsample,"N" = length(data_subsample),"Npred"=Npred)
+
+outputmcmcAR2_INF <- jags(model.file=textConnection(modelAR2.string),
+                     data=line_data,
+                     parameters.to.save= c('alpha', 'beta',"sigma2","m0","Yp","ypOut","LogLik"), 
+                     n.adapt=1000, n.iter=10000,n.chains = 1,n.burnin = 2000)
+
+```
+
+
+```{r}
+t=seq(1,Ntot)
+tt=seq(1,N)
+#
+yp=outputmcmcAR2_INF$mean$Yp
+q1=outputmcmcAR2_INF$q2.5$Yp
+q2=outputmcmcAR2_INF$q97.5$Yp
+#
+
+alpha_hati = outputmcmcAR2_INF$mean$alpha
+m0_hati = outputmcmcAR2_INF$mean$m0
+#
+plot(t,infData,col="red",ylab="mu_t",main="data (red), in samp.pred. (blue)")
+lines(t,infData,col="red")
+points(tt,yp,pch="*",col="blue")
+lines(tt,q1,type="l",col="blue",lwd = 1.5)
+lines(tt,q2,type="l",col="blue",lwd = 1.5)
+#
+yp_pred=outputmcmcAR2_INF$mean$ypOut
+q1_pred=outputmcmcAR2_INF$q2.5$ypOut
+q2_pred=outputmcmcAR2_INF$q97.5$ypOut
+#
+plot(t,infData,col="red",ylab="mu_t",ylim=c(min(q1_pred),max(q2_pred)),
+     main= "out-of-sample prediction (orange)")
+lines(t,infData,col="red")
+abline(v=N,col="orange")
+
+lines(tt,yp,type="p",pch="*",col="blue",)
+lines(tt,q1,type="l",col="blue",lwd = 1.5)
+lines(tt,q2,type="l",col="blue",lwd = 1.5)
+points(seq((N+1),Ntot,1),pch="*",yp_pred,col="orange")
+lines(seq((N+1),Ntot,1),q1_pred,col="orange",lwd = 1.5)
+lines(seq((N+1),Ntot,1),q2_pred,col="orange",lwd = 1.5)
+```
+```{r}
+plot(outputmcmcAR2_INF$samples[,c("alpha")],main="posterior alpha")
+plot(outputmcmcAR2_INF$samples[,c("beta")],main="posterior beta")
+plot(outputmcmcAR2_INF$samples[,c("sigma2")],main="posterior sigma^2")
+```
+
+
+```{r}
+autocorr.plot(outputmcmcAR2_INF$samples[,c("alpha")],main="alpha ACF")
+autocorr.plot(outputmcmcAR2_INF$samples[,c("beta")],main="beta ACF")
+autocorr.plot(outputmcmcAR2_INF$samples[,c("sigma2")],main="sigma2 ACF")
+```
+
+## AR Model Selection
+
+```{r}
+### Calcolo del WAIC per GDP AR(1)
+loglik=outputmcmcAR_GDP$sims.list$LogLik # model without change point
+print(length(loglik))
+GDPAR1_waic<- waic(loglik)
+print(GDPAR1_waic)
+
+average_loglik <- colMeans(loglik)
+tot_loglik <- sum(average_loglik)
+k=3
+BIC_AR_GDP <- -2*tot_loglik + k*log(N)
+```
+
+```{r}
+### Calcolo del WAIC per CPI AR(1)
+loglik=outputmcmcAR_INF$sims.list$LogLik # model without change point
+print(length(loglik))
+INFAR1_waic<- waic(loglik)
+print(INFAR1_waic)
+average_loglik <- colMeans(loglik)
+tot_loglik <- sum(average_loglik)
+k=3 
+BIC_AR_INF <- -2*tot_loglik + k*log(N)
+```
+
+```{r}
+### Calcolo del WAIC per GDP AR(2)
+loglik<- outputmcmcAR2_GDP$sims.list$LogLik # model without change point
+print(length(loglik))
+sum(is.na(loglik))
+GDPAR2_waic<- waic(loglik)
+print(GDPAR2_waic)
+average_loglik <- colMeans(loglik)
+tot_loglik <- sum(average_loglik)
+k=4
+BIC_AR2_GDP <- -2*tot_loglik + k*log(N)
+```
+
+```{r}
+### Calcolo del WAIC per CPI AR(2)
+loglik=outputmcmcAR2_INF$sims.list$LogLik # model without change point
+print(length(loglik))
+
+INFAR2_waic<- waic(loglik)
+print(INFAR2_waic)
+average_loglik <- colMeans(loglik)
+tot_loglik <- sum(average_loglik)
+k=4
+BIC_AR2_INF <- -2*tot_loglik + k*log(N)
+```
+
+```{r}
+BIC_AR_GDP
+BIC_AR2_GDP
+```
+
+```{r}
+BIC_AR_INF
+BIC_AR2_INF
+```
+
+
+```{r}
+dic_ARGDP <- outputmcmcAR_GDP$DIC
+dic_ARINF <- outputmcmcAR_INF$DIC
+dic_AR2GDP <- outputmcmcAR2_GDP$DIC
+dic_AR2INF <- outputmcmcAR2_GDP$DIC
+```
+
+```{r}
+dic_ARGDP
+dic_AR2GDP
+```
+
+```{r}
+dic_ARINF
+dic_AR2INF
+```
+
+According to both, the results of the BIC and the DIC for the proposed models, it is reasonable to state that the AR(1) model fits best the data available since it overfits it less, while maintaining more or less the same effectivity on the prediction.
+
+# ARMA Models  
+
+An ARMA(1) model is a time series model defined as follows. Starting 
+from $y_1$ one recursively define for $t \geq 1$
+\[
+y_{t+1}=\mu+\alpha y_t +\beta\epsilon_t+\epsilon_{t+1} \qquad 
+\epsilon_t \stackrel{iid}{\sim} \mathcal{N}(0,\sigma^2)
+\]
+
+```{r}
+modelARMA.string <-"
+model {
+  ## parameters: alpha, beta, tau, m0
+  # likelihood
+  mu[1] <- Y[1]
+  Yp[1] <- mu[1]
+  eps[1] <- 0
+  LogLik[1] <- log(dnorm(Y[1], mu[1], tau))
+  
+  for (i in 2:N) {
+    eps[i] ~ dnorm(0, tau_eps)  # errore bianco
+    Y[i] ~ dnorm(mu[i], tau)
+    mu[i] <- m0 + alpha * Y[i-1] + beta * eps[i-1]
+    Yp[i] ~ dnorm(mu[i], tau) # prediction in sample
+    
+    # Calcolo della log-verosimiglianza per ogni osservazione
+    LogLik[i] <- log(dnorm(Y[i], mu[i], tau))
+    
+    
+  }
+  
+ 
+ # prediction out of sample 
+  ypOut[1] ~ dnorm(m0 + alpha * Y[N] + beta * eps[N], tau)
+  for (k in 2:Npred) {
+    eps[N + k - 1] ~ dnorm(0, tau_eps)  # errore bianco per le previsioni future
+    ypOut[k] ~ dnorm(m0 + alpha * ypOut[k-1] + beta * eps[N + k - 1], tau)
+  }
+  sigma2 <- 1 / tau
+  sigma_eps2 <- 1 / tau_eps
+  # priors 
+  alpha ~ dunif(-1.5, 1.5)
+  beta ~ dunif(-1.5, 1.5)
+  tau ~ dgamma(0.1, 10)
+  tau_eps ~ dgamma(0.1, 10)
+  m0 ~ dnorm(0.0, 1.0E-4)
+}"
+
+```
+
+
+## ARMA(1,1) model GDP
+
+
+```{r}
+
+# prepare the data 
+gdpData = as.numeric(gdpData)
+Ntot=length(gdpData)
+Npred=50 # horizon for out-of-sample prediction
+N=Ntot-Npred
+data_subsample=gdpData[1:N]
+
+line_data <- list("Y" =data_subsample,"N" = length(data_subsample),"Npred"=Npred)
+
+outputmcmcARMA_GDP <- jags(model.file = textConnection(modelARMA.string),
+                           data = line_data,
+                           parameters.to.save = c('alpha', 'beta', "sigma2", "sigma_eps2", "m0", "Yp", "ypOut", "LogLik"),
+                           n.adapt = 1000, n.iter = 10000, n.chains = 1, n.burnin = 2000)
+
+```
+
+
+```{r}
+t = seq(1, Ntot)
+tt = seq(1, N)
+
+# Previsioni in-sample
+yp = outputmcmcARMA_GDP$mean$Yp
+q1 = outputmcmcARMA_GDP$q2.5$Yp
+q2 = outputmcmcARMA_GDP$q97.5$Yp
+
+# Calcolo del valore predittivo medio vero (true predictive mean) per confronto
+#alpha_hat = outputmcmcARMA_GDP$mean$alpha
+#beta_hat = outputmcmcARMA_GDP$mean$beta
+#m0_hat = outputmcmcARMA_GDP$mean$m0
+
+
+
+#mutrue = m0_hat + alpha_hat * c(NA, gdpData[-length(gdpData)]) + beta_hat * c(0, diff(gdpData))
+#mutrue = mutrue[-1]
+#mutrue = c(0, mutrue)
+#mutrue = mutrue[1:N]
+
+#plot(t, gdpData, col="red", ylab="mu_t",
+   #  main="data (red), true pred. means (magenta), in samp.pred. (blue)")
+#lines(t, gdpData, col="red")
+#lines(tt, mutrue[1:N], col="magenta")
+#lines(tt, mutrue[1:N], col="magenta", type="p")
+#points(tt, yp, pch="*", col="blue")
+#lines(tt, q1, type="l", col="blue", lwd=1.5)
+#lines(tt, q2, type="l", col="blue", lwd=1.5)
+
+# Previsioni out-of-sample
+yp_pred = outputmcmcARMA_GDP$mean$ypOut
+q1_pred = outputmcmcARMA_GDP$q2.5$ypOut
+q2_pred = outputmcmcARMA_GDP$q97.5$ypOut
+
+plot(t, gdpData, col="red", ylab="mu_t", ylim=c(min(q1), max(q2)),
+     main="GDP: in samp.pred. (blue) out-of-sample prediction (orange)")
+abline(v=N, col="orange")
+lines(tt, yp, type="p", pch="*", col="blue")
+lines(tt, q1, type="l", col="blue", lwd=1.5)
+lines(tt, q2, type="l", col="blue", lwd=1.5)
+points(seq((N+1), Ntot, 1), yp_pred, pch="*", col="orange")
+lines(seq((N+1), Ntot, 1), q1_pred, col="orange", lwd=1.5)
+lines(seq((N+1), Ntot, 1), q2_pred, col="orange", lwd=1.5)
+```
+```{r}
+plot(outputmcmcARMA_GDP$samples[,c("alpha")],main="posterior alpha")
+plot(outputmcmcARMA_GDP$samples[,c("sigma2")],main="posterior sigma^2")
+```
+
+## ARMA(1,1) model Inflation
+
+```{r}
+
+# prepare the data 
+infData = as.numeric(infData)
+Ntot=length(infData)
+Npred=50 # horizon for out-of-sample prediction
+N=Ntot-Npred
+data_subsample=infData[1:N]
+
+line_data <- list("Y" =data_subsample,"N" = length(data_subsample),"Npred"=Npred)
+
+outputmcmcARMA_INF <- jags(model.file = textConnection(modelARMA.string),
+                           data = line_data,
+                           parameters.to.save = c('alpha', 'beta', "sigma2", "sigma_eps2", "m0", "Yp", "ypOut", "LogLik"),
+                           n.adapt = 1000, n.iter = 10000, n.chains = 1, n.burnin = 2000)
+
+```
+
+
+```{r}
+t = seq(1, Ntot)
+tt = seq(1, N)
+
+# Previsioni in-sample
+yp = outputmcmcARMA_INF$mean$Yp
+q1 = outputmcmcARMA_INF$q2.5$Yp
+q2 = outputmcmcARMA_INF$q97.5$Yp
+
+# Calcolo del valore predittivo medio vero (true predictive mean) per confronto
+#alpha_hat = outputmcmcARMA_INF$mean$alpha
+#beta_hat = outputmcmcARMA_INF$mean$beta
+#m0_hat = outputmcmcARMA_INF$mean$m0
+#mutrue = m0_hat + alpha_hat * c(NA, gdpData[-length(gdpData)]) + beta_hat * c(0, diff(gdpData))
+#mutrue = mutrue[-1]
+#mutrue = c(0, mutrue)
+#mutrue = mutrue[1:N]
+#plot(t, infData, col="red", ylab="mu_t",
+#     main="data (red), true pred. means (magenta), ")
+#lines(t, infData, col="red")
+#lines(tt, mutrue[1:N], col="magenta")
+#lines(tt, mutrue[1:N], col="magenta", type="p")
+#points(tt, yp, pch="*", col="blue")
+#lines(tt, q1, type="l", col="blue", lwd=1.5)
+#lines(tt, q2, type="l", col="blue", lwd=1.5)
+
+# Previsioni out-of-sample
+yp_pred = outputmcmcARMA_INF$mean$ypOut
+q1_pred = outputmcmcARMA_INF$q2.5$ypOut
+q2_pred = outputmcmcARMA_INF$q97.5$ypOut
+
+plot(t, infData, col="red", ylab="mu_t", ylim=c(min(q1_pred), max(q2_pred)),
+     main="INF: in samp.pred. (blue) out-of-sample prediction (orange)")
+abline(v=N, col="orange")
+lines(tt, yp, type="p", pch="*", col="blue")
+lines(tt, q1, type="l", col="blue", lwd=1.5)
+lines(tt, q2, type="l", col="blue", lwd=1.5)
+points(seq((N+1), Ntot, 1), yp_pred, pch="*", col="orange")
+lines(seq((N+1), Ntot, 1), q1_pred, col="orange", lwd=1.5)
+lines(seq((N+1), Ntot, 1), q2_pred, col="orange", lwd=1.5)
+
+```
+```{r}
+plot(outputmcmcARMA_INF$samples[,c("alpha")],main="posterior alpha")
+plot(outputmcmcARMA_INF$samples[,c("sigma2")],main="posterior sigma^2")
+```
+
+
+```{r}
+# Estrarre i parametri stimati dal risultato MCMC
+#alpha_hat <- outputmcmcARMA_GDP$mean$alpha
+#beta_hat <- outputmcmcARMA_GDP$mean$beta
+#tau_hat <- outputmcmcARMA_GDP$meant$tau
+#m0 <- outputmcmcARMA_GDP$sims.list$m0
+#params <- c(alpha_hat, beta_hat, tau_hat, m0)
+
+# Verificare che i parametri stimati non siano NA
+#if (any(is.na(params))) {
+#  stop("Ci sono parametri stimati che sono NA.")
+#}
+
+# Verificare che i dati non contengano NA o infiniti  
+#if (any(is.na(gdpData)) || any(is.infinite(gdpData))) {
+#  stop("I dati contengono NA o valori infiniti.")
+#}
+
+
+
+
+# Funzione per calcolare la log-verosimiglianza del modello ARMA
+#logLik_arma <- function(params, data) {
+#  alpha <- params[1]
+#  beta <- params[2]
+#  tau <- params[3]
+#  m0 <- params[4]
+  
+#  N <- length(data)
+ # logLik <- 0
+#  mu <- numeric(N)
+#  eps <- numeric(N)
+#  mu[1] <- data[1]
+  
+#  for (i in 2:N) {
+#    eps[i] <- data[i] - (m0 + alpha * data[i-1] + beta * eps[i-1])
+ #   mu[i] <- m0 + alpha * data[i-1] + beta * eps[i-1]
+    
+    # Calcola la log-verosimiglianza e verifica eventuali problemi
+#    logLik_i <- dnorm(data[i], mean=mu[i], sd=sqrt(1/tau), log=TRUE)
+    
+    #Altre verifiche per quando i torni non contano (non vengono stampate se è tutto ok)
+#   if (is.na(logLik_i)) {
+#      print(paste("NA in logLik a i =", i))
+#     print(paste("data[i] =", data[i]))
+#      print(paste("mu[i] =", mu[i]))
+#      print(paste("m0 =", m0))
+#      print(paste("alpha =", alpha))
+#     print(paste("data[i-1] =", data[i-1]))
+#      print(paste("beta =", beta))
+#      print(paste("eps[i-1] =", eps[i-1]))
+    
+ #     print(paste("tau =", tau))
+ #     stop("Log-verosimiglianza è NA.")
+  #  }
+    
+ #   logLik <- logLik + logLik_i
+#  }
+  
+#  return(logLik)
+#}
+
+
+# Calcola la log-verosimiglianza per i dati GDP
+#logLik_value <- logLik_arma(params, gdpData)
+
+# Numero di parametri stimati
+#k <- length(params)
+
+# Numero di osservazioni
+#n <- length(gdpData)
+
+# Calcola il BIC
+#BIC_GDP <- -2 * logLik_value + k * log(N)
+#BIC_GDP
+
+
+dic_value_GDP <- outputmcmcARMA_GDP$DIC
+print("DIC:")
+dic_value_GDP
+
+
+
+loglik_GDP=outputmcmcARMA_GDP$sims.list$LogLik
+average_loglik <-colMeans(loglik_GDP)
+tot_loglik <- sum(average_loglik)
+k=4
+
+BIC_GDP <- -2*tot_loglik+k*log(N)
+print("BIC:")
+BIC_GDP
+
+waic_GDP <- waic(loglik_GDP)
+print("WAIC:")
+
+waic_GDP
+
+```
+
+
+
+```{r}
+# DIC
+dic_value_INF <- outputmcmcARMA_INF$DIC
+print("DIC:")
+dic_value_INF
+
+
+
+loglik_INF=outputmcmcARMA_INF$sims.list$LogLik
+
+
+
+average_loglik <-colMeans(loglik_INF)
+tot_loglik <- sum(average_loglik)
+k=4
+print("BIC:")
+BIC_INF <- -2*tot_loglik+k*log(N)
+BIC_INF
+
+
+# WAIC
+waic_INF <- waic(loglik_INF)
+print("WAIC:")
+waic_INF
+```
+
+
+
+## VAR(1) model INF
+
+```{r}
+modelVAR.string <- "model {
+   ## parameters:  a11, a12, a21, a22, [m01 m02]
+   
+   #likelihood
+   mu[1:2,1]<- Y[1:2,1]
+   Yp[1:2,1]<- mu[1:2,1]
+   LogLik[1]<-logdensity.mnorm(Y[1:2,1], mu[1:2,1], omega)
+   for (i in 2:N) {
+      mu[1,i]<- m0[1] + (a11*Y[1,i-1]) + (a12*Y[2, i-1])
+      mu[2,i]<- m0[2] + (a21*Y[1, i-1]) +(a22*Y[2, i-1])
+      Y[1:2,i] ~ dmnorm(mu[1:2,i], omega[1:2,1:2])
+      Yp[1:2,i] ~ dmnorm(mu[1:2,i], omega)
+      LogLik[i]<-logdensity.mnorm(Y[1:2,i], mu[1:2, i], omega)
+   }
+   #prediction out of sample
+   mp[1,1]<- m0[1] + (a11* Y[1,N]) + (a12*Y[2,N])
+   mp[2,1]<- m0[2] + (a21*Y[2,N]) + (a22*Y[2,N])
+   ypOut[1:2,1] ~ dmnorm(mp[1:2,1], omega)
+   for ( k in 2:Npred){
+      mp[1,k]<- m0[1] +(a11*ypOut[1,k-1]) + (a12 * ypOut[2,k-1])
+      mp[2,k]<- m0[2] +(a21*ypOut[1,k-1]) + (a22*ypOut[2,k-1])
+      ypOut[1:2,k] ~ dmnorm(mp[1:2,k], omega)
+   }
+   # priors
+   a11 ~ dunif(-1.5, 1.5)
+   a12 ~ dunif(-1.5, 1.5)
+   a21 ~ dunif(-1.5, 1.5)
+   a22 ~ dunif(-1.5, 1.5)
+   m<- 3
+   omega ~ dwish(R,m)
+   m0 ~ dmnorm(vec, S)
+
+}"
+```
+
+
+
+modelAR.string <-"model {
+  ## parameters: alpha,tau,m0
+  #likeliohood 
+  mu[1]<-Y[1]
+  Yp[1]=mu[1]
+  LogLik[1] = 0
+  for (i in 2:N) {
+    mu[i]<-m0+alpha*Y[i-1]
+    Y[i] ~ dnorm(mu[i],tau)
+    Yp[i] ~ dnorm(mu[i],tau) # prediction in sample
+    LogLik[i] <- log(dnorm( Y[i],mu[i],tau))
+  }
+  # prediction out of sample 
+  ypOut[1] ~dnorm(m0+alpha*Y[N],tau) 
+  for(k in 2:Npred){
+  ypOut[k] ~dnorm(m0+alpha*ypOut[k-1],tau) 
+  }
+  sigma2<-1/tau
+  #prior 
+  alpha ~ dunif(-1.5,1.5)
+  tau ~ dgamma(0.1, 10)
+  m0 ~dnorm(0.0, 1.0E-4)
+}"
+```{r}
+
+
+
+gdpData = as.numeric(gdpData)
+infData = as.numeric(infData)
+data = rbind(gdpData, infData)
+Ntot = length(gdpData)-1
+Npred=30 # horizon for out-of-sample prediction
+N=Ntot-Npred
+data_sub_gdp=gdpData[1:N]
+data_sub_inf=infData[1:N]
+data_subsample= rbind(data_sub_gdp, data_sub_inf)
+print(data_subsample[1:2, 1:5])
+print(dim(data_subsample))
+
+R <- matrix(0, nrow = 2, ncol = 2)
+R[1,1]<- 0.1
+R[1,2]<-0
+R[2,1]<-0
+R[2,2]<- 0.1
+
+S <- matrix(0, nrow = 2, ncol = 2)
+S[1,1]<-1.0E-4
+S[1,2]<-0
+S[2,1]<-0
+S[2,2]<-1.0E-4
+vec = c(0,0)
+print(N)
+
+line_data <- list("Y" = data_subsample, "N" = N, "Npred"=Npred, "R"= R, "S" = S, "vec"= vec)
+
+outputVAR <- jags(model.file=textConnection(modelVAR.string),
+                  data = line_data,
+                  parameters.to.save = c("a11", "a12", "a21", "a22", "m0", "omega","LogLik", "Yp", "ypOut"),
+                  n.adapt = 1000, n.iter = 10000, n.chains = 1, n.burnin = 2000
+)
+
+
+
+```
+
+
+```{r}
+t=seq(1,Ntot+1)
+tt=seq(1,N)
+yp_gdp = outputVAR$mean$Yp[1,]
+yp_inf = outputVAR$mean$Yp[2,]
+q1_gdp = outputVAR$q2.5$Yp[1,]
+q2_gdp = outputVAR$q97.5$Yp[1,]
+q1_inf = outputVAR$q2.5$Yp[2,]
+q2_inf = outputVAR$q97.5$Yp[2,]
+
+plot(t, gdpData, col="red",ylab = "annual growth rate", main = " gdp data (red), gdp sample prediction (blue)" )
+lines(t, gdpData, col = "red")
+points(tt, yp_gdp, pch = "*", col = "blue")
+lines(tt, q1_gdp, type = "l", col = "blue", lwd = 1.5)
+lines(tt, q2_gdp, type = "l", col = "blue", lwd = 1.5)
+
+yp_gdp_pred = outputVAR$mean$ypOut[1,]
+q1_pred_gdp =outputVAR$q2.5$ypOut[1,]
+q2_pred_gdp =outputVAR$q97.5$ypOut[1,]
+yp_inf_pred = outputVAR$mean$ypOut[2,]
+q1_pred_inf = outputVAR$q2.5$ypOut[2,]
+q2_pred_inf = outputVAR$q97.5$ypOut[2,]
+
+plot(t,gdpData,col="red",ylab="annual growth rate",ylim=c(min(q1_pred_gdp),max(q2_pred_gdp)),
+     main= "out-of-sample prediction (orange)")
+abline(v=N,col="orange")
+lines(tt,yp_gdp,type="p",pch="*",col="blue")
+lines(tt,q1_gdp,type="l",col="blue",lwd = 1.5)
+lines(tt,q2_gdp,type="l",col="blue",lwd = 1.5)
+points(seq((N+1),Ntot,1),pch="*",yp_gdp_pred,col="orange")
+lines(seq((N+1),Ntot,1),q1_pred_gdp,col="orange",lwd = 1.5)
+lines(seq((N+1),Ntot,1),q2_pred_gdp,col="orange",lwd = 1.5)
+
+plot(t, infData, col = "deeppink", ylab = "annual growth rate of Inf",main = "inf data (magenta), inf sample pred (purple)")
+lines(t, infData, col = "deeppink")
+points(tt, yp_inf, pch = "*", col = "springgreen")
+lines(tt, q1_inf, type = "l", col = "springgreen", lwd = 1.5)
+lines(tt, q2_inf, type = "l", col = "springgreen", lwd = 1.5)
+
+plot(t, infData, col = "deeppink", ylab = "annual growth rate", ylim = c(min(q1_pred_inf), max(q2_pred_inf)),
+     main = "out of sample prediction (orange)" )
+abline(v = N, col = "orange")
+lines (tt, yp_inf, type = "p", pch = "*", col = "springgreen")
+lines(tt, q1_inf, type = "l", col = "springgreen", lwd = 1.5)
+lines(tt, q2_inf, type = "l", col = "springgreen", lwd = 1.5)
+points(seq((N+1), Ntot, 1), pch = "*", yp_inf_pred, col = "orange" )
+lines(seq((N+1), Ntot,1), q1_pred_inf, col = "orange", lwd = 1.5)
+lines(seq((N+1), Ntot,1), q2_pred_inf, col = "orange", lwd = 1.5)
+
+
+
+
+
+
+plot(outputVAR$samples[,c("a11")], main = "a11")
+plot(outputVAR$samples[,c("a12")], main = "a12")
+plot(outputVAR$samples[,c("a21")], main = "a21")
+plot(outputVAR$samples[,c("a22")], main = "a22")
+plot(outputVAR$samples[,c("m0[1]")], main = "m01")
+plot(outputVAR$samples[,c("m0[2]")], main = "m02")
+
+outputVAR$mean$omega
+
+
+```
+
+```{R}
+outputVAR$mean$omega
+
+DIC = outputVAR$DIC
+
+loglik = outputVAR$sims.list$LogLik
+
+waic <- waic(loglik)
+
+average_loglik <- colMeans(loglik)
+tot_loglik <- sum(average_loglik)
+k = 8
+BIC <- -2*tot_loglik + k*log(N)
+
+print("waic:")
+print(waic)
+print("DIC:")
+print(DIC)
+print("BIC:")
+print(BIC)
+```
