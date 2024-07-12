@@ -138,16 +138,16 @@ q1 = outputmcmcARMA_GDP$q2.5$Yp
 q2 = outputmcmcARMA_GDP$q97.5$Yp
 
 # Calcolo del valore predittivo medio vero (true predictive mean) per confronto
-alpha_hat = outputmcmcARMA_GDP$mean$alpha
-beta_hat = outputmcmcARMA_GDP$mean$beta
-m0_hat = outputmcmcARMA_GDP$mean$m0
+#alpha_hat = outputmcmcARMA_GDP$mean$alpha
+#beta_hat = outputmcmcARMA_GDP$mean$beta
+#m0_hat = outputmcmcARMA_GDP$mean$m0
 
 
 
-mutrue = m0_hat + alpha_hat * c(NA, gdpData[-length(gdpData)]) + beta_hat * c(0, diff(gdpData))
-mutrue = mutrue[-1]
-mutrue = c(0, mutrue)
-mutrue = mutrue[1:N]
+#mutrue = m0_hat + alpha_hat * c(NA, gdpData[-length(gdpData)]) + beta_hat * c(0, diff(gdpData))
+#mutrue = mutrue[-1]
+#mutrue = c(0, mutrue)
+#mutrue = mutrue[1:N]
 
 #plot(t, gdpData, col="red", ylab="mu_t",
    #  main="data (red), true pred. means (magenta), in samp.pred. (blue)")
@@ -164,7 +164,7 @@ q1_pred = outputmcmcARMA_GDP$q2.5$ypOut
 q2_pred = outputmcmcARMA_GDP$q97.5$ypOut
 
 plot(t, gdpData, col="red", ylab="mu_t", ylim=c(min(q1), max(q2)),
-     main="out-of-sample prediction (orange)")
+     main="GDP: in samp.pred. (blue) out-of-sample prediction (orange)")
 abline(v=N, col="orange")
 lines(tt, yp, type="p", pch="*", col="blue")
 lines(tt, q1, type="l", col="blue", lwd=1.5)
@@ -226,7 +226,7 @@ q2 = outputmcmcARMA_INF$q97.5$Yp
 #mutrue = c(0, mutrue)
 #mutrue = mutrue[1:N]
 #plot(t, infData, col="red", ylab="mu_t",
-#     main="data (red), true pred. means (magenta), in samp.pred. (blue)")
+#     main="data (red), true pred. means (magenta), ")
 #lines(t, infData, col="red")
 #lines(tt, mutrue[1:N], col="magenta")
 #lines(tt, mutrue[1:N], col="magenta", type="p")
@@ -240,7 +240,7 @@ q1_pred = outputmcmcARMA_INF$q2.5$ypOut
 q2_pred = outputmcmcARMA_INF$q97.5$ypOut
 
 plot(t, infData, col="red", ylab="mu_t", ylim=c(min(q1_pred), max(q2_pred)),
-     main="out-of-sample prediction (orange)")
+     main="INF: in samp.pred. (blue) out-of-sample prediction (orange)")
 abline(v=N, col="orange")
 lines(tt, yp, type="p", pch="*", col="blue")
 lines(tt, q1, type="l", col="blue", lwd=1.5)
@@ -337,8 +337,8 @@ k <- length(params)
 n <- length(gdpData)
 
 # Calcola il BIC
-BIC <- -2 * logLik_value + k * log(n)
-BIC
+BIC_GDP <- -2 * logLik_value + k * log(n)
+BIC_GDP
 
 
 dic_value_GDP <- outputmcmcARMA_GDP$DIC
@@ -378,7 +378,7 @@ if (any(is.na(infData)) || any(is.infinite(infData))) {
 
 
 
-# Funzione per calcolare la log-verosimiglianza del modello ARMA
+# Log-likeliwood del modello ARMA
 logLik_arma <- function(params, data) {
   alpha <- params[1]
   beta <- params[2]
@@ -395,12 +395,10 @@ logLik_arma <- function(params, data) {
     eps[i] <- data[i] - (m0 + alpha * data[i-1] + beta * eps[i-1])
     mu[i] <- m0 + alpha * data[i-1] + beta * eps[i-1]
     
-    # Calcolo la log-verosimiglianza e verifica eventuali problemi 
+    # Calcolo la log-lik e verifico eventuali problemi 
     logLik_i <- dnorm(data[i], mean=mu[i], sd=sqrt(1/tau), log=TRUE)
     
-    #volendo questi li possiamo eliminare 
     if (is.na(logLik_i)) {
-      print(paste("NA in logLik a i =", i))
       print(paste("data[i] =", data[i]))
       print(paste("mu[i] =", mu[i]))
       print(paste("m0 =", m0))
@@ -419,20 +417,21 @@ logLik_arma <- function(params, data) {
 }
 
 
-# Calcola la log-verosimiglianza per i dati Inf
+# Log-likelihood per i dati Inf
 logLik_value <- logLik_arma(params, infData)
 
-# Numero di parametri stimati (lo sappiamo già quanti sono)
+# Numero di parametri stimati 
 k <- length(params)
 
 # Numero di osservazioni
 n <- length(infData)
 
-# Calcolare il BIC
-BIC <- -2 * logLik_value + k * log(n)
-BIC
+#  BIC
+BIC_GDP <- -2 * logLik_value + k * log(n)
+BIC_GDP
 
-# Calcolare il DIC
+
+# DIC
 dic_value_INF <- outputmcmcARMA_INF$DIC
 dic_value_INF
 
@@ -440,8 +439,9 @@ dic_value_INF
 
 loglik_INF=outputmcmcARMA_INF$sims.list$LogLik
 
-#print(loglik_GDP)
-# Calcolare il WAIC
+
+#print(loglik_INF)
+# WAIC
 waic_INF <- waic(loglik_INF)
 waic_INF
 ```
@@ -449,41 +449,3 @@ waic_INF
 
  
 
-
-
-```{r}
-
-```
-
-
-
-
-```{r}
-
-
-
-
-```
-
-
-
-
-
-```{r}
-
-```
-
- 
-
-
-
-
-
-
-
-
-
-
-```{r}
-
-```
