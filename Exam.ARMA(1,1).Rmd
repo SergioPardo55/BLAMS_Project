@@ -114,7 +114,7 @@ model {
 # prepare the data 
 gdpData = as.numeric(gdpData)
 Ntot=length(gdpData)
-Npred=100 # horizon for out-of-sample prediction
+Npred=50 # horizon for out-of-sample prediction
 N=Ntot-Npred
 data_subsample=gdpData[1:N]
 
@@ -149,11 +149,11 @@ mutrue = mutrue[-1]
 mutrue = c(0, mutrue)
 mutrue = mutrue[1:N]
 
-plot(t, gdpData, col="red", ylab="mu_t",
-     main="data (red), true pred. means (magenta), in samp.pred. (blue)")
-lines(t, gdpData, col="red")
+#plot(t, gdpData, col="red", ylab="mu_t",
+   #  main="data (red), true pred. means (magenta), in samp.pred. (blue)")
+#lines(t, gdpData, col="red")
 #lines(tt, mutrue[1:N], col="magenta")
-lines(tt, mutrue[1:N], col="magenta", type="p")
+#lines(tt, mutrue[1:N], col="magenta", type="p")
 #points(tt, yp, pch="*", col="blue")
 #lines(tt, q1, type="l", col="blue", lwd=1.5)
 #lines(tt, q2, type="l", col="blue", lwd=1.5)
@@ -194,7 +194,7 @@ y_{t+1}=\mu+\alpha y_t +\beta\epsilon_t+\epsilon_{t+1} \qquad
 # prepare the data 
 infData = as.numeric(infData)
 Ntot=length(infData)
-Npred=100 # horizon for out-of-sample prediction
+Npred=50 # horizon for out-of-sample prediction
 N=Ntot-Npred
 data_subsample=infData[1:N]
 
@@ -202,7 +202,7 @@ line_data <- list("Y" =data_subsample,"N" = length(data_subsample),"Npred"=Npred
 
 outputmcmcARMA_INF <- jags(model.file = textConnection(modelARMA.string),
                            data = line_data,
-                           parameters.to.save = c('alpha', 'beta', "sigma2", "sigma_eps2", "m0", "Yp", "ypOut"),
+                           parameters.to.save = c('alpha', 'beta', "sigma2", "sigma_eps2", "m0", "Yp", "ypOut", "LogLik"),
                            n.adapt = 1000, n.iter = 10000, n.chains = 1, n.burnin = 2000)
 
 ```
@@ -218,32 +218,28 @@ q1 = outputmcmcARMA_INF$q2.5$Yp
 q2 = outputmcmcARMA_INF$q97.5$Yp
 
 # Calcolo del valore predittivo medio vero (true predictive mean) per confronto
-alpha_hat = outputmcmcARMA_INF$mean$alpha
-beta_hat = outputmcmcARMA_INF$mean$beta
-m0_hat = outputmcmcARMA_INF$mean$m0
-
-
-
-mutrue = m0_hat + alpha_hat * c(NA, gdpData[-length(gdpData)]) + beta_hat * c(0, diff(gdpData))
-mutrue = mutrue[-1]
-mutrue = c(0, mutrue)
-mutrue = mutrue[1:N]
-
-plot(t, infData, col="red", ylab="mu_t",
-     main="data (red), true pred. means (magenta), in samp.pred. (blue)")
-lines(t, infData, col="red")
-lines(tt, mutrue[1:N], col="magenta")
-lines(tt, mutrue[1:N], col="magenta", type="p")
-points(tt, yp, pch="*", col="blue")
-lines(tt, q1, type="l", col="blue", lwd=1.5)
-lines(tt, q2, type="l", col="blue", lwd=1.5)
+#alpha_hat = outputmcmcARMA_INF$mean$alpha
+#beta_hat = outputmcmcARMA_INF$mean$beta
+#m0_hat = outputmcmcARMA_INF$mean$m0
+#mutrue = m0_hat + alpha_hat * c(NA, gdpData[-length(gdpData)]) + beta_hat * c(0, diff(gdpData))
+#mutrue = mutrue[-1]
+#mutrue = c(0, mutrue)
+#mutrue = mutrue[1:N]
+#plot(t, infData, col="red", ylab="mu_t",
+#     main="data (red), true pred. means (magenta), in samp.pred. (blue)")
+#lines(t, infData, col="red")
+#lines(tt, mutrue[1:N], col="magenta")
+#lines(tt, mutrue[1:N], col="magenta", type="p")
+#points(tt, yp, pch="*", col="blue")
+#lines(tt, q1, type="l", col="blue", lwd=1.5)
+#lines(tt, q2, type="l", col="blue", lwd=1.5)
 
 # Previsioni out-of-sample
 yp_pred = outputmcmcARMA_INF$mean$ypOut
 q1_pred = outputmcmcARMA_INF$q2.5$ypOut
 q2_pred = outputmcmcARMA_INF$q97.5$ypOut
 
-plot(t, infData, col="red", ylab="mu_t", ylim=c(min(q1), max(q2)),
+plot(t, infData, col="red", ylab="mu_t", ylim=c(min(q1_pred), max(q2_pred)),
      main="out-of-sample prediction (orange)")
 abline(v=N, col="orange")
 lines(tt, yp, type="p", pch="*", col="blue")
@@ -269,19 +265,19 @@ plot(outputmcmcARMA_INF$samples[,c("sigma2")],main="posterior sigma^2")
 
 
 ```{r}
-# Estrai i parametri stimati dal risultato MCMC
+# Estrarre i parametri stimati dal risultato MCMC
 alpha_hat <- outputmcmcARMA_GDP$mean$alpha
 beta_hat <- outputmcmcARMA_GDP$mean$beta
 tau_hat <- outputmcmcARMA_GDP$meant$tau
 m0 <- outputmcmcARMA_GDP$sims.list$m0
 params <- c(alpha_hat, beta_hat, tau_hat, m0)
 
-# Verifica che i parametri stimati non siano NA
+# Verificare che i parametri stimati non siano NA
 if (any(is.na(params))) {
   stop("Ci sono parametri stimati che sono NA.")
 }
 
-# Verifica che i dati non contengano NA o infiniti
+# Verificare che i dati non contengano NA o infiniti  
 if (any(is.na(gdpData)) || any(is.infinite(gdpData))) {
   stop("I dati contengono NA o valori infiniti.")
 }
@@ -309,6 +305,7 @@ logLik_arma <- function(params, data) {
     # Calcola la log-verosimiglianza e verifica eventuali problemi
     logLik_i <- dnorm(data[i], mean=mu[i], sd=sqrt(1/tau), log=TRUE)
     
+    #Altre verifiche per quando i torni non contano (non vengono stampate se è tutto ok)
     if (is.na(logLik_i)) {
       print(paste("NA in logLik a i =", i))
       print(paste("data[i] =", data[i]))
@@ -344,24 +341,109 @@ BIC <- -2 * logLik_value + k * log(n)
 BIC
 
 
-dic_value <- outputmcmcARMA_GDP$DIC
-dic_value
+dic_value_GDP <- outputmcmcARMA_GDP$DIC
+dic_value_GDP
 
 
 
-loglik_A=outputmcmcARMA_GDP$sims.list$LogLik
+loglik_GDP=outputmcmcARMA_GDP$sims.list$LogLik
 
-#print(loglik_A)
+#print(loglik_GDP)
 
-waic_A <- waic(loglik_A)
-waic_A
+waic_GDP <- waic(loglik_GDP)
+waic_GDP
 
 ```
 
 
 
 ```{r}
+# Estrazione dei parametri stimati dal risultato MCMC
+alpha_hat <- outputmcmcARMA_INF$mean$alpha
+beta_hat <- outputmcmcARMA_INF$mean$beta
+tau_hat <- outputmcmcARMA_INF$meant$tau
+m0 <- outputmcmcARMA_INF$sims.list$m0
+params <- c(alpha_hat, beta_hat, tau_hat, m0)
 
+# Verifico che i parametri stimati non siano NA
+if (any(is.na(params))) {
+  stop("Ci sono parametri stimati che sono NA.")
+}
+
+# Verifico che i dati non contengano NA o infiniti
+if (any(is.na(infData)) || any(is.infinite(infData))) {
+  stop("I dati contengono NA o valori infiniti.")
+}
+
+
+
+
+# Funzione per calcolare la log-verosimiglianza del modello ARMA
+logLik_arma <- function(params, data) {
+  alpha <- params[1]
+  beta <- params[2]
+  tau <- params[3]
+  m0 <- params[4]
+  
+  N <- length(data)
+  logLik <- 0
+  mu <- numeric(N)
+  eps <- numeric(N)
+  mu[1] <- data[1]
+  
+  for (i in 2:N) {
+    eps[i] <- data[i] - (m0 + alpha * data[i-1] + beta * eps[i-1])
+    mu[i] <- m0 + alpha * data[i-1] + beta * eps[i-1]
+    
+    # Calcolo la log-verosimiglianza e verifica eventuali problemi 
+    logLik_i <- dnorm(data[i], mean=mu[i], sd=sqrt(1/tau), log=TRUE)
+    
+    #volendo questi li possiamo eliminare 
+    if (is.na(logLik_i)) {
+      print(paste("NA in logLik a i =", i))
+      print(paste("data[i] =", data[i]))
+      print(paste("mu[i] =", mu[i]))
+      print(paste("m0 =", m0))
+      print(paste("alpha =", alpha))
+      print(paste("data[i-1] =", data[i-1]))
+      print(paste("beta =", beta))
+      print(paste("eps[i-1] =", eps[i-1]))
+      print(paste("tau =", tau))
+      stop("Log-verosimiglianza è NA.")
+    }
+    
+    logLik <- logLik + logLik_i
+  }
+  
+  return(logLik)
+}
+
+
+# Calcola la log-verosimiglianza per i dati Inf
+logLik_value <- logLik_arma(params, infData)
+
+# Numero di parametri stimati (lo sappiamo già quanti sono)
+k <- length(params)
+
+# Numero di osservazioni
+n <- length(infData)
+
+# Calcolare il BIC
+BIC <- -2 * logLik_value + k * log(n)
+BIC
+
+# Calcolare il DIC
+dic_value_INF <- outputmcmcARMA_INF$DIC
+dic_value_INF
+
+
+
+loglik_INF=outputmcmcARMA_INF$sims.list$LogLik
+
+#print(loglik_GDP)
+# Calcolare il WAIC
+waic_INF <- waic(loglik_INF)
+waic_INF
 ```
 
 
@@ -393,16 +475,7 @@ waic_A
 
  
 
-```{r}
 
-```
-
-
-
-
-```{r}
-
-```
 
 
 
