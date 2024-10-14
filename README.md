@@ -121,8 +121,20 @@ Visualizations of the posterior analysis can be found in the `Posterior_Analysis
 
 ## 8. References
 
-1. Kotu, Vijay, and Bala Deshpande. *Data Science (Second Edition)*, 2019.
-2. Bobbitt, Z. (2021). *Time Series Analysis with Bayesian Methods*. 
+ 1. Vijay Kotu, Bala Deshpande, in Data Science (Second Edition), 2019
+ 2. Bobbitt, Z. (2021, September 1). How to calculate BIC in R. Statology.
+ https://www.statology.org/bic-in-r/
+ 3. Robert, C. P., & Robert, J. M. &. C. (n.d.). Bayesian Core.
+ https://www.ceremade.dauphine.fr/ xian/BCS/index.html#Slides
+ 9
+4. U.S. Bureau of Economic Analysis, Gross Domestic Product [GDP], re
+trieved from FRED, Federal Reserve Bank of St. Louis;
+ https://fred.stlouisfed.org/series/GDP, May 16, 2024.
+ 5. Plummer, Stukalov & Denwood (2023, November). Bayesian Graphical
+ Models using MCMC. Retrieved from
+ https://cran.r-project.org/web/packages/rjags/rjags.pdf
+ 6. Nres. (n.d.). Model selection. https://kevintshoemaker.github.io/NRES
+746/LECTURE8.html
 
 For more detailed information on the models and methodology, refer to the [Report](./Report).
 
