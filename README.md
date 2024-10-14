@@ -65,7 +65,7 @@ We implement the following models:
 - Each model includes carefully chosen prior distributions (Uniform, Normal, Gamma) to reflect minimal prior information.
 - The likelihoods for each model are based on standard assumptions of normality for errors.
 
-For more details, refer to the [Report](./Report.pdf) and the R code files in the repository.
+For more details, refer to the [Report](./Report) and the R code files in the repository.
 
 ## 4. Methodology
 
@@ -112,13 +112,9 @@ Visualizations of the posterior analysis can be found in the `Posterior_Analysis
    ```R
    install.packages(c("rjags", "coda", "ggplot2", "bayesplot"))
    ```
-3. Open the R scripts in the `Code/` directory and run the files in the following order:
-   - `AR_Model.R`
-   - `ARMA_Model.R`
-   - `VAR_Model.R`
+3. Open the R scripts in the `Code/` directory and run the files.
 
-4. The models will automatically perform MCMC sampling and generate posterior distributions. Plots and results will be saved in the `Results/` directory.
-
+   
 ## 8. References
 
  1. Vijay Kotu, Bala Deshpande, in Data Science (Second Edition), 2019
