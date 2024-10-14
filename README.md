@@ -1,108 +1,133 @@
-# Bayesian Learning and Monte Carlo Simulations: US GDP & Inflation
-
-## Project Overview
-
-This project aims to model and analyze two key economic indicators of the United States: **Gross Domestic Product (GDP)** and the **Consumer Price Index (CPI)**, using Bayesian learning and Monte Carlo simulations. The project explores several time series models, including AR, ARMA, and VAR models, to fit and analyze the time series data. Additionally, model comparison and evaluation are performed using Information Criteria like BIC, DIC, and WAIC.
+Ecco un esempio di file `README.md` per il progetto **Bayesian Learning and Monte Carlo Simulations (BLAMS)**, che può essere utilizzato nella tua repository GitHub.
 
 ---
+
+# Bayesian Learning and Monte Carlo Simulations (BLAMS) Project
+
+## Project Title: GDP and Inflation Time Series Analysis
+
+### Repository URL: [BLAMS_Project](https://github.com/SergioPardo55/BLAMS_Project)
+
+## Authors:
+- **Chiara Zappia** - ID: 10724941
+- **Sergio Pardo Gutierrez** - ID: 10985243
+- **Sara Fossà** - ID: 11016799
 
 ## Table of Contents
+1. [Project Overview](#project-overview)
+2. [Data Description](#data-description)
+3. [Model Specifications](#model-specifications)
+4. [Methodology](#methodology)
+5. [Model Comparison](#model-comparison)
+6. [Posterior Analysis](#posterior-analysis)
+7. [How to Run the Code](#how-to-run-the-code)
+8. [References](#references)
 
-- [Project Description](#project-description)
-- [Data](#data)
-- [Models Implemented](#models-implemented)
-- [Results](#results)
-- [Installation and Usage](#installation-and-usage)
-- [Contributors](#contributors)
-  
----
+## 1. Project Overview
 
-## Project Description
+This project focuses on the Bayesian analysis of time series data from the **Gross Domestic Product (GDP)** and **Consumer Price Index (CPI)** of the United States. Our objective is to:
 
-In this project, we implemented various Bayesian time series models to analyze and forecast **US GDP** and **CPI** data. The following models were explored:
+- Analyze and model the two time series separately using different statistical models such as AR(1), ARMA(1,1), and AR(2).
+- Compare the models' performance using information criteria (BIC, DIC, and WAIC).
+- Perform a joint analysis using a bivariate **Vector Autoregression (VAR)** model.
 
-- **Autoregressive (AR)** models
-- **Autoregressive Moving Average (ARMA)** models
-- **Vector Autoregression (VAR)** models for bivariate analysis
+### Goals:
+- Fit individual time series models for GDP and CPI.
+- Compare models using information criteria.
+- Conduct joint modeling using VAR for bivariate analysis.
+- Provide insights through Bayesian posterior analysis and model diagnostics.
 
-The project objectives are as follows:
+## 2. Data Description
 
-1. Fit time series models to GDP and CPI data.
-2. Compare the models using **BIC**, **DIC**, and **WAIC** criteria.
-3. Perform a posterior analysis of the models and interpret results.
+The data used in this project consists of two time series:
+1. **Gross Domestic Product (GDP)**: Measures the market value of goods and services produced in the United States.
+   - Frequency: Quarterly
+   - Source: [U.S. Bureau of Economic Analysis](https://fred.stlouisfed.org/series/HSN1F)
+2. **Consumer Price Index (CPI)**: Measures the average change over time in the prices paid by urban consumers for a basket of goods and services.
+   - Frequency: Quarterly
+   - Source: [U.S. Bureau of Labor Statistics](https://fred.stlouisfed.org/series/CPIAUCSL)
 
----
+The dataset covers the period from **1948-01-01 to 2024-01-01** and has been pre-processed to calculate the percent change from the previous year.
 
-## Data
+## 3. Model Specifications
 
-The dataset used for the analysis consists of time series data on **US GDP** and **Inflation (CPI)**, obtained from the [Federal Reserve Economic Data (FRED)](https://fred.stlouisfed.org/series/HSN1F). The data represents quarterly observations of:
+We implement the following models:
 
-- **GDP**: Seasonally adjusted, measured in billions of dollars.
-- **CPI**: Represents consumer inflation, seasonally adjusted, indexed to 1982-1984=100.
+1. **Autoregressive (AR) Models**:
+   - **AR(1)**: Predicts future values based on the immediate past observation.
+   - **AR(2)**: Incorporates two lagged values to predict future observations.
 
----
+2. **Autoregressive Moving Average (ARMA)**:
+   - **ARMA(1,1)**: Combines AR and MA components to describe the time series behavior.
 
-## Models Implemented
+3. **Vector Autoregression (VAR)**:
+   - **VAR(1)**: Models GDP and CPI jointly, capturing the linear interdependencies between the two variables.
 
-1. **AR(1), AR(2) Models**  
-   Used for univariate modeling of both GDP and CPI series. These models assume that future values are based on a linear relationship of past values.
+### Priors and Likelihoods:
+- Each model includes carefully chosen prior distributions (Uniform, Normal, Gamma) to reflect minimal prior information.
+- The likelihoods for each model are based on standard assumptions of normality for errors.
 
-2. **ARMA(1,1) Model**  
-   Combines autoregressive (AR) and moving average (MA) processes to describe time series behavior.
+For more details, refer to the [Report](./Report.pdf) and the R code files in the repository.
 
-3. **VAR(1) Model**  
-   A multivariate model used for the joint modeling of GDP and CPI series, capturing interdependencies between them.
+## 4. Methodology
 
-Each model was fitted using **Bayesian inference** through **MCMC sampling** implemented in **R with JAGS**. 
+The models were implemented using **JAGS** (Just Another Gibbs Sampler) through **R** for Bayesian inference. MCMC methods were used to sample from posterior distributions, with the following parameters:
+- `n.adapt = 1000`, `n.iter = 10000`, `n.burnin = 2000`, and `n.chains = 1`.
 
----
+### Tools:
+- **R**: Main language for model implementation.
+- **JAGS**: Used for Bayesian inference and MCMC simulations.
+- **ggplot2**: For visualization of posterior distributions.
 
-## Results
+## 5. Model Comparison
 
-- **Model Comparison**  
-  We compared the models using **Bayesian Information Criterion (BIC)**, **Deviance Information Criterion (DIC)**, and **Watanabe-Akaike Information Criterion (WAIC)**.
+We compared the models using three main criteria:
+- **BIC** (Bayesian Information Criterion)
+- **DIC** (Deviance Information Criterion)
+- **WAIC** (Watanabe-Akaike Information Criterion)
 
-  The AR(1) model showed the best performance for both GDP and CPI in terms of **BIC**, **DIC**, and **WAIC**.
+The **AR(1)** model was found to be the best for **GDP** data based on all criteria, while the **AR(2)** model was preferred for **CPI** data.
 
-- **Posterior Analysis**  
-  Posterior distributions were analyzed, and 95% credible intervals were computed for key parameters such as the autoregressive coefficient, and variance of the error term.
+## 6. Posterior Analysis
 
-See the **report.pdf** for detailed results, including plots of posterior distributions and trace plots.
+Posterior distributions were analyzed and plotted to evaluate the uncertainty and variability in the model's estimates. Confidence intervals and trace plots for model parameters (e.g., autoregressive coefficients) were included in the analysis.
 
----
+Example of posterior analysis for AR(1) GDP and CPI models:
+- **Posterior Mean**: Estimation of central tendency.
+- **95% Credible Interval**: Range of plausible values for model parameters.
 
+Visualizations of the posterior analysis can be found in the `Posterior_Analysis` folder.
 
-## Installation and Usage
+## 7. How to Run the Code
 
-1. Clone the repository:
+### Prerequisites
+- **R** (version ≥ 4.0)
+- **JAGS** (version ≥ 4.3.0)
+- R packages: `rjags`, `coda`, `ggplot2`, `bayesplot`
 
+### Steps:
+1. Clone this repository to your local machine:
    ```bash
-   git clone https://github.com/yourusername/gdp-inflation-project.git
-   cd gdp-inflation-project
+   git clone https://github.com/SergioPardo55/BLAMS_Project.git
    ```
-
-2. Install the required packages:
-
-   In **R**, install necessary packages using:
-
+2. Install the required R packages:
    ```R
-   install.packages(c("rjags", "coda", "ggplot2"))
+   install.packages(c("rjags", "coda", "ggplot2", "bayesplot"))
    ```
+3. Open the R scripts in the `Code/` directory and run the files in the following order:
+   - `AR_Model.R`
+   - `ARMA_Model.R`
+   - `VAR_Model.R`
 
-3. Run the scripts:
+4. The models will automatically perform MCMC sampling and generate posterior distributions. Plots and results will be saved in the `Results/` directory.
 
-   - To fit the models:  
-     Open **models.R** and run the code in **RStudio**.
-   
-   - To generate posterior plots:  
-     Run **posterior_analysis.R**.
+## 8. References
+
+1. Kotu, Vijay, and Bala Deshpande. *Data Science (Second Edition)*, 2019.
+2. Bobbitt, Z. (2021). *Time Series Analysis with Bayesian Methods*. 
+
+For more detailed information on the models and methodology, refer to the [Report](./Report.pdf).
 
 ---
 
-## Contributors
-
-- Chiara Fossà  
-- Sergio Pardo  
-- Sara Zappia  
-
-**Supervised by:** Prof. F. Bassetti  
+This README provides a clear structure for understanding the project's objectives, data, methods, and how to execute the code. Let me know if you need further customizations!
