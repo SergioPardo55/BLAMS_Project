@@ -1,6 +1,4 @@
-Ecco un esempio di file `README.md` per il progetto **Bayesian Learning and Monte Carlo Simulations (BLAMS)**, che può essere utilizzato nella tua repository GitHub.
 
----
 
 # Bayesian Learning and Monte Carlo Simulations (BLAMS) Project
 
@@ -128,6 +126,4 @@ Visualizations of the posterior analysis can be found in the `Posterior_Analysis
 
 For more detailed information on the models and methodology, refer to the [Report](./Report.pdf).
 
----
 
-This README provides a clear structure for understanding the project's objectives, data, methods, and how to execute the code. Let me know if you need further customizations!
