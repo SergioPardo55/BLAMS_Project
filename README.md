@@ -124,6 +124,6 @@ Visualizations of the posterior analysis can be found in the `Posterior_Analysis
 1. Kotu, Vijay, and Bala Deshpande. *Data Science (Second Edition)*, 2019.
 2. Bobbitt, Z. (2021). *Time Series Analysis with Bayesian Methods*. 
 
-For more detailed information on the models and methodology, refer to the [Report](./Report.pdf).
+For more detailed information on the models and methodology, refer to the [Report](./report.pdf).
 
 
