@@ -7,9 +7,9 @@
 ### Repository URL: [BLAMS_Project](https://github.com/SergioPardo55/BLAMS_Project)
 
 ## Authors:
-- **Chiara Zappia** - ID: 10724941
+- **Chiara Fossà** - ID: 10724941
 - **Sergio Pardo Gutierrez** - ID: 10985243
-- **Sara Fossà** - ID: 11016799
+- **Sara Zappia** - ID: 11016799
 
 ## Table of Contents
 1. [Project Overview](#project-overview)
